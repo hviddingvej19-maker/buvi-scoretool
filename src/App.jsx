@@ -803,7 +803,7 @@ export default function BuviScoringPrototype() {
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <Badge>BUVI prototype</Badge>
-              <Badge>OxF scoringsværktøj v0.2</Badge>
+              <Badge>OxF scoringsværktøj v0.2.1-balance</Badge>
               <Badge tone="green">Anchor-baseret scoring</Badge>
             </div>
             <h1 className="text-3xl font-semibold tracking-tight">Konfigurerbart scoringsværktøj</h1>
