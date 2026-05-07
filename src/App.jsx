@@ -204,6 +204,62 @@ function uniqueById(list) {
   return Array.from(map.values());
 }
 
+function getDimensionCounts(factors) {
+  const value = factors.filter((factor) => factor.dim === "Værdi").length;
+  const feasibility = factors.filter((factor) => factor.dim === "Gennemførlighed").length;
+  const difference = Math.abs(value - feasibility);
+  return {
+    value,
+    feasibility,
+    difference,
+    isBalanced: difference <= 1,
+  };
+}
+
+function priorityScore(candidates, count, priorityMap) {
+  return candidates.slice(0, count).reduce((sum, factor) => sum + (priorityMap.get(factor.id) || 0), 0);
+}
+
+function buildBalancedFactorList(sortedFactors, factorLimit) {
+  const valueCandidates = sortedFactors.filter((factor) => factor.dim === "Værdi");
+  const feasibilityCandidates = sortedFactors.filter((factor) => factor.dim === "Gennemførlighed");
+  const priorityMap = new Map(sortedFactors.map((factor, index) => [factor.id, sortedFactors.length - index]));
+  const maxTotal = Math.min(factorLimit, sortedFactors.length);
+
+  let best = null;
+
+  for (let total = maxTotal; total >= 0; total -= 1) {
+    for (let valueCount = 0; valueCount <= total; valueCount += 1) {
+      const feasibilityCount = total - valueCount;
+      const isValid =
+        Math.abs(valueCount - feasibilityCount) <= 1 &&
+        valueCount <= valueCandidates.length &&
+        feasibilityCount <= feasibilityCandidates.length;
+
+      if (!isValid) continue;
+
+      const score =
+        priorityScore(valueCandidates, valueCount, priorityMap) +
+        priorityScore(feasibilityCandidates, feasibilityCount, priorityMap);
+
+      if (!best || score > best.score) {
+        best = { valueCount, feasibilityCount, score, total };
+      }
+    }
+
+    if (best) break;
+  }
+
+  if (!best) return sortedFactors.slice(0, factorLimit);
+
+  const selectedValueIds = new Set(valueCandidates.slice(0, best.valueCount).map((factor) => factor.id));
+  const selectedFeasibilityIds = new Set(feasibilityCandidates.slice(0, best.feasibilityCount).map((factor) => factor.id));
+
+  return sortedFactors.filter((factor) =>
+    factor.dim === "Værdi" ? selectedValueIds.has(factor.id) : selectedFeasibilityIds.has(factor.id)
+  );
+}
+
 function buildFactors(companyPackage, initiativeType, factorLimit) {
   const boostedModules = industryBoosts[companyPackage] || [];
   const direct = moduleFactors[initiativeType] || [];
@@ -212,15 +268,16 @@ function buildFactors(companyPackage, initiativeType, factorLimit) {
     .map((factor) => ({ ...factor, weight: factor.weight * 0.9 }));
   const directIds = new Set(direct.map((factor) => factor.id));
 
-  return uniqueById([...coreFactors, ...direct, ...industry])
+  const sortedFactors = uniqueById([...coreFactors, ...direct, ...industry])
     .sort((a, b) => {
       const directA = directIds.has(a.id) ? 1 : 0;
       const directB = directIds.has(b.id) ? 1 : 0;
       if (directA !== directB) return directB - directA;
       if (a.dim !== b.dim) return a.dim === "Værdi" ? -1 : 1;
       return b.weight - a.weight;
-    })
-    .slice(0, factorLimit);
+    });
+
+  return buildBalancedFactorList(sortedFactors, factorLimit);
 }
 
 function getDefaultCenterConfig(factor) {
@@ -453,6 +510,17 @@ function displayRawScore(value) {
 function runPrototypeTests() {
   const nyboFactors = buildFactors("tekstil_workwear", "produkt_cirkularitet", 12);
   console.assert(nyboFactors.length <= 12, "buildFactors respects factor limit");
+  console.assert(getDimensionCounts(nyboFactors).isBalanced, "Nybo factor list respects value/feasibility balance");
+  console.assert(getDimensionCounts(buildFactors("erhvervsfremme_netvaerk", "esg_data", 12)).isBalanced, "Business Viborg ESG factor list is balanced");
+  console.assert(getDimensionCounts(buildFactors("byggeri_anlaeg", "materialer_spild", 11)).difference <= 1, "odd factor limits allow max one factor difference");
+  companies.forEach((company) => {
+    initiativeTypes.forEach((initiativeType) => {
+      maturityOptions.forEach((maturityOption) => {
+        const factors = buildFactors(company.package, initiativeType.id, maturityOption.factorLimit);
+        console.assert(getDimensionCounts(factors).difference <= 1, `balanced factors for ${company.id}/${initiativeType.id}/${maturityOption.id}`);
+      });
+    });
+  });
   console.assert(nyboFactors.some((factor) => factor.id === "returflow"), "Nybo circularity includes take-back factor");
   console.assert(uniqueById([{ id: "a" }, { id: "a" }, { id: "b" }]).length === 2, "uniqueById removes duplicate IDs");
   const scores = defaultScores(nyboFactors);
@@ -474,6 +542,7 @@ function runPrototypeTests() {
   console.assert(applyAnchorClick({ low: 3, high: 9, touched: true }, 12).low === 3, "click above interval keeps low boundary");
   console.assert(applyAnchorClick({ low: 3, high: 9, touched: true }, 12).high === 12, "click above interval extends high boundary");
   console.assert(buildFactors("unknown", "unknown", 20).length === coreFactors.length, "unknown config falls back to core factors");
+  console.assert(getDimensionCounts(buildFactors("unknown", "unknown", 20)).isBalanced, "unknown config fallback remains balanced");
   console.assert(companies.some((company) => company.id === "business_viborg"), "Business Viborg is available as an organization");
   console.assert(buildFactors("erhvervsfremme_netvaerk", "esg_data", 12).some((factor) => factor.id === "kildedokumentation"), "Business Viborg configuration includes ESG data factors");
   console.assert(weightedAverage([], {}, "Værdi", "best") === null, "empty factor list returns null average before scoring");
@@ -644,6 +713,7 @@ export default function BuviScoringPrototype() {
     () => buildFactors(company.package, initiativeType, maturityOption.factorLimit),
     [company.package, initiativeType, maturityOption.factorLimit, resetCounter]
   );
+  const factorCounts = getDimensionCounts(factors);
 
   const initialScores = useMemo(() => defaultScores(factors), [factors]);
   const [scores, setScores] = useState(savedState?.scores || initialScores);
@@ -817,6 +887,12 @@ export default function BuviScoringPrototype() {
                 <div className="rounded-xl bg-slate-100 p-3">
                   <div className="text-xs text-slate-500">Faktorer i skema</div>
                   <div className="font-medium">{factors.length} faktorer</div>
+                  <div className="mt-1 text-xs text-slate-500">{factorCounts.value} Værdi / {factorCounts.feasibility} Gennemførlighed</div>
+                </div>
+                <div className={`rounded-xl p-3 ring-1 ${factorCounts.isBalanced ? "bg-emerald-50 ring-emerald-200" : "bg-rose-50 ring-rose-200"}`}>
+                  <div className="text-xs text-slate-500">Balancekrav</div>
+                  <div className="font-medium">{factorCounts.isBalanced ? "Opfyldt" : "Kræver justering"}</div>
+                  <div className="mt-1 text-xs text-slate-500">Maks. forskel: 1 faktor</div>
                 </div>
                 <div className="rounded-xl bg-slate-100 p-3">
                   <div className="text-xs text-slate-500">Moduler</div>
