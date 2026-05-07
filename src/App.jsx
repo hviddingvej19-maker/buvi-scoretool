@@ -1,0 +1,1047 @@
+import React, { useMemo, useState } from "react";
+
+const SCORE_LEVELS = [0, 3, 6, 9, 12];
+
+const DATA_CONFIDENCE_DESCRIPTIONS = {
+  1: "Meget svagt datagrundlag: scoren bygger primært på mavefornemmelse, generelle antagelser eller AI-estimat uden konkret virksomhedsdata.",
+  2: "Svagt datagrundlag: der findes enkelte oplysninger eller erfaringstal, men centrale forudsætninger mangler stadig at blive dokumenteret.",
+  3: "Rimeligt datagrundlag: de vigtigste antagelser er kendte, og scoren kan forklares, men der mangler stadig validering eller præcise målinger.",
+  4: "Godt datagrundlag: scoren bygger på konkrete data, relevante kilder og tydelige antagelser, men er ikke nødvendigvis verificeret eksternt.",
+  5: "Stærkt datagrundlag: scoren er dokumenteret, sporbar og kan efterprøves af ledelse, kunde eller ekstern part.",
+};
+
+const STORAGE_KEY = "buvi-scoretool-workshop-v1";
+
+function loadSavedWorkshopState() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch (error) {
+    console.warn("Kunne ikke indlæse lokal BUVI-data", error);
+    return null;
+  }
+}
+
+function saveWorkshopState(state) {
+  if (typeof window === "undefined") return false;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, savedAt: new Date().toISOString() }));
+    return true;
+  } catch (error) {
+    console.warn("Kunne ikke gemme lokal BUVI-data", error);
+    return false;
+  }
+}
+
+function clearSavedWorkshopState() {
+  if (typeof window === "undefined") return false;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+    return true;
+  } catch (error) {
+    console.warn("Kunne ikke nulstille lokal BUVI-data", error);
+    return false;
+  }
+}
+
+const companies = [
+  { id: "business_viborg", name: "Business Viborg", package: "erhvervsfremme_netvaerk", label: "Erhvervsfremme / netværk / rådgivning / workshopfacilitering" },
+  { id: "fredborg", name: "Fredborg A/S", package: "byggeri_anlaeg", label: "Byggeri / erhvervsbyggeri" },
+  { id: "geovent", name: "Geovent A/S", package: "tekniske_produkter", label: "Industriel ventilation / tekniske produkter" },
+  { id: "himmerland", name: "Himmerlandskød A/S", package: "foedevarer", label: "Fødevarer / kødforædling" },
+  { id: "jema", name: "JEMA AGRO A/S", package: "produktion_agro", label: "Agro / maskin- og udstyrsproduktion" },
+  { id: "kematek", name: "KEMATEK Danmark ApS", package: "kemi_industri", label: "Industriel kemi / smøremidler" },
+  { id: "kloak", name: "Kloak Ekspressen", package: "kloak_miljoe", label: "Kloakservice / miljøteknik" },
+  { id: "myrthue", name: "Myrthue A/S Tømrer & Snedker", package: "byggeri_anlaeg", label: "Tømrer / snedker / byggeri" },
+  { id: "nybo", name: "Nybo Workwear A/S", package: "tekstil_workwear", label: "Tekstil / arbejdstøj" },
+  { id: "tjele", name: "Tjele Entreprenør Forretning", package: "byggeri_anlaeg", label: "Entreprenør / anlæg / kloak" },
+];
+
+const initiativeTypes = [
+  { id: "energi_drift", name: "Energi og drift", hint: "Varmepumpe, LED, procesenergi, køl, trykluft, varmegenvinding" },
+  { id: "flaade_transport", name: "Flåde og transport", hint: "Elbiler, ruteoptimering, brændstof, maskiner, servicekørsel" },
+  { id: "materialer_spild", name: "Materialer og spild", hint: "Affald, råvarer, procesoptimering, genbrug, materialeskift" },
+  { id: "produkt_cirkularitet", name: "Produkt og cirkularitet", hint: "Reparation, take-back, levetid, service-/returmodeller" },
+  { id: "esg_data", name: "ESG-data og rapportering", hint: "Datakilder, dokumentation, klimaregnskab, leverandørdata" },
+  { id: "klimakommunikation", name: "Klimakommunikation", hint: "Grønne udsagn, hjemmeside, salgsargumenter, dokumentationskrav" },
+  { id: "arbejdsmiljoe_social", name: "Arbejdsmiljø og social bæredygtighed", hint: "Sikkerhed, trivsel, inklusion, kompetencer, lokale effekter" },
+];
+
+const maturityOptions = [
+  { id: "screening", name: "Screening", factorLimit: 8, hint: "Få faktorer, hurtigt overblik, høj usikkerhed accepteres" },
+  { id: "workshop", name: "Workshop-standard", factorLimit: 12, hint: "God balance mellem dialog, scoring og konkret næste skridt" },
+  { id: "business_case", name: "Business case", factorLimit: 16, hint: "Flere faktorer, tydeligere datakrav og økonomisk vurdering" },
+  { id: "kommunikation", name: "Kommunikation / rapportering", factorLimit: 14, hint: "Dokumentation, verificerbarhed og greenwashing-risiko vægtes højere" },
+];
+
+const anchorStyleOptions = [
+  {
+    id: "absolute",
+    name: "Absolutte scoregrænser",
+    hint: "Bruges når score 6 kan beskrives med et konkret tal, fx 10 tons CO2e, 50.000 kr. eller 30 dage. Score 0, 3, 9 og 12 beregnes automatisk ud fra score 6-niveauet.",
+  },
+  {
+    id: "relative",
+    name: "Relative forbedringer",
+    hint: "Bruges når effekten bedst beskrives som forbedring i forhold til baseline, fx procentvis reduktion eller forbedring.",
+  },
+  {
+    id: "general",
+    name: "Generelle vurderingsbeskrivelser",
+    hint: "Bruges tidligt i workshoppen, når der ikke er nok data til talgrænser endnu.",
+  },
+  {
+    id: "documentation",
+    name: "Dokumentationssprog",
+    hint: "Bruges når vurderingen især skal handle om dokumentation, sporbarhed og om scoren kan forklares eksternt.",
+  },
+];
+
+const coreFactors = [
+  { id: "co2", dim: "Værdi", name: "CO2- og miljøeffekt", tags: ["core", "klima"], weight: 1.15, anchor0: "Negativ eller udokumenteret miljøeffekt", anchor12: ">30 % forbedring eller transformativ effekt" },
+  { id: "opex", dim: "Værdi", name: "Driftsøkonomisk effekt", tags: ["core", "økonomi"], weight: 1.05, anchor0: "Øger driftsomkostninger uden gevinst", anchor12: "Meget kort tilbagebetaling eller markant OPEX-besparelse" },
+  { id: "strategi", dim: "Værdi", name: "Regulatorisk og strategisk relevans", tags: ["core", "compliance"], weight: 1.0, anchor0: "Modarbejder strategi eller skaber risiko", anchor12: "Nødvendigt for lovkrav eller strategisk nøgleprioritet" },
+  { id: "kundevaerdi", dim: "Værdi", name: "Kundeværdi", tags: ["core", "marked"], weight: 0.95, anchor0: "Negativ eller ingen kundeeffekt", anchor12: "Afgørende for markedsadgang eller differentiering" },
+  { id: "kapacitet", dim: "Gennemførlighed", name: "Intern kapacitet og viden", tags: ["core", "organisation"], weight: 1.0, anchor0: "Ingen relevante kompetencer", anchor12: "Fuld kapacitet og kompetence er til stede" },
+  { id: "investering", dim: "Gennemførlighed", name: "Investeringsbyrde", tags: ["core", "økonomi"], weight: 1.05, anchor0: "Urealistisk investering ift. økonomisk kapacitet", anchor12: "Ingen eller minimal investering krævet" },
+  { id: "teknisk", dim: "Gennemførlighed", name: "Teknisk modenhed", tags: ["core", "teknik"], weight: 0.95, anchor0: "Uprøvet løsning med høj usikkerhed", anchor12: "Standardiseret og fuldt afprøvet løsning" },
+  { id: "data", dim: "Gennemførlighed", name: "Datakvalitet og dokumentation", tags: ["core", "data"], weight: 1.15, anchor0: "Ingen data eller dokumentation", anchor12: "Stærke, sporbare og verificerbare data" },
+];
+
+const moduleFactors = {
+  energi_drift: [
+    { id: "energi", dim: "Værdi", name: "Energiforbrug", tags: ["energi", "klima"], weight: 1.2, anchor0: "Ingen målbar energiforbedring", anchor12: "Stor og dokumenterbar energireduktion" },
+    { id: "driftsforstyrrelse", dim: "Gennemførlighed", name: "Driftsforstyrrelse", tags: ["drift"], weight: 0.95, anchor0: "Kræver lang nedetid eller høj produktionsrisiko", anchor12: "Kan gennemføres uden væsentlig driftsforstyrrelse" },
+    { id: "tilbagebetaling", dim: "Værdi", name: "Tilbagebetalingstid", tags: ["økonomi"], weight: 1.05, anchor0: ">7 år eller ukendt", anchor12: "<1 år eller meget sikker økonomisk gevinst" },
+  ],
+  flaade_transport: [
+    { id: "braendstof", dim: "Værdi", name: "Brændstof-/energiforbrug", tags: ["transport", "energi"], weight: 1.15, anchor0: "Ingen reduktion", anchor12: "Markant reduktion i energi pr. km/opgave" },
+    { id: "asset", dim: "Gennemførlighed", name: "Asset-levetid og udskiftningscyklus", tags: ["transport"], weight: 0.95, anchor0: "Udskiftning sker på dårligt tidspunkt", anchor12: "Passer perfekt med naturlig udskiftning" },
+    { id: "infrastruktur", dim: "Gennemførlighed", name: "Ladning / infrastruktur / forsyning", tags: ["transport", "drift"], weight: 1.05, anchor0: "Kritisk flaskehals", anchor12: "Infrastruktur er klar og driftssikker" },
+  ],
+  materialer_spild: [
+    { id: "ressourcer", dim: "Værdi", name: "Ressourceforbrug", tags: ["materialer"], weight: 1.2, anchor0: "Øger ressourceforbruget", anchor12: "Reducerer råvareforbrug markant" },
+    { id: "affald", dim: "Værdi", name: "Affaldsgenerering", tags: ["affald"], weight: 1.05, anchor0: "Mere affald eller vanskeligere bortskaffelse", anchor12: "Markant mindre affald eller højere genanvendelse" },
+    { id: "procesfit", dim: "Gennemførlighed", name: "Procesfit", tags: ["produktion", "drift"], weight: 0.95, anchor0: "Kræver grundlæggende procesændring", anchor12: "Passer direkte i eksisterende proces" },
+  ],
+  produkt_cirkularitet: [
+    { id: "levetid", dim: "Værdi", name: "Levetidsforlængelse", tags: ["cirkularitet", "produkt"], weight: 1.15, anchor0: "Ingen levetidsforlængelse", anchor12: "Levetid forlænges markant og dokumenterbart" },
+    { id: "returflow", dim: "Gennemførlighed", name: "Returflow og take-back-infrastruktur", tags: ["cirkularitet", "logistik"], weight: 1.1, anchor0: "Ingen returproces", anchor12: "Integreret take-back med data, sortering og partnerflow" },
+    { id: "cirkulaer_model", dim: "Værdi", name: "Cirkulær forretningsmodelværdi", tags: ["cirkularitet", "marked"], weight: 1.05, anchor0: "Ingen forretningsmæssig kobling", anchor12: "Ny eller stærkt forbedret cirkulær forretningsmodel" },
+    { id: "sporbarhed", dim: "Gennemførlighed", name: "Sporbarhed", tags: ["data", "produkt"], weight: 1.0, anchor0: "Ingen sporbarhed", anchor12: "Sporbarhed på produkt-, materiale- og kunde-/batchniveau" },
+  ],
+  esg_data: [
+    { id: "kildedokumentation", dim: "Gennemførlighed", name: "Kildedokumentation", tags: ["data", "rapportering"], weight: 1.2, anchor0: "Kilder mangler eller er usikre", anchor12: "Kilder er dokumenterede, sporbare og ajourførte" },
+    { id: "esrs", dim: "Værdi", name: "Rapporteringsegnethed", tags: ["rapportering", "compliance"], weight: 1.05, anchor0: "Kan ikke bruges i ESG-opgørelse", anchor12: "Direkte anvendeligt i ESG-/kunderapportering" },
+    { id: "systematik", dim: "Gennemførlighed", name: "Dataflow og systematik", tags: ["data", "proces"], weight: 1.0, anchor0: "Manuel, usikker og personafhængig proces", anchor12: "Stabilt dataflow med ansvar, frekvens og kontrol" },
+  ],
+  klimakommunikation: [
+    { id: "greenwashing", dim: "Gennemførlighed", name: "Greenwashing-risiko", tags: ["kommunikation", "compliance"], weight: 1.25, anchor0: "Høj risiko for vildledende udsagn", anchor12: "Udsagn er konkrete, præcise og dokumenterede" },
+    { id: "kommunikationsvaerdi", dim: "Værdi", name: "Kommunikationsværdi", tags: ["kommunikation", "marked"], weight: 0.9, anchor0: "Lav eller negativ kommunikationsværdi", anchor12: "Stærk og troværdig fortælling med høj relevans" },
+    { id: "verificerbarhed", dim: "Gennemførlighed", name: "Verificerbarhed", tags: ["data", "kommunikation"], weight: 1.15, anchor0: "Kan ikke efterprøves", anchor12: "Kan kontrolleres af tredjepart eller kunde" },
+  ],
+  arbejdsmiljoe_social: [
+    { id: "arbejdsmiljoe", dim: "Værdi", name: "Arbejdsmiljø og sikkerhed", tags: ["social", "arbejdsmiljø"], weight: 1.15, anchor0: "Forringer arbejdsmiljø eller sikkerhed", anchor12: "Markant og dokumenterbar forbedring" },
+    { id: "kompetencer", dim: "Gennemførlighed", name: "Kompetencebehov", tags: ["organisation"], weight: 0.95, anchor0: "Kræver omfattende ny kompetencebase", anchor12: "Kan løftes med eksisterende kompetencer" },
+    { id: "medarbejderaccept", dim: "Gennemførlighed", name: "Medarbejderaccept", tags: ["social", "organisation"], weight: 1.0, anchor0: "Forventet modstand", anchor12: "Stærk accept og tydeligt ejerskab" },
+  ],
+};
+
+const industryBoosts = {
+  erhvervsfremme_netvaerk: ["esg_data", "klimakommunikation", "arbejdsmiljoe_social"],
+  byggeri_anlaeg: ["materialer_spild", "arbejdsmiljoe_social", "klimakommunikation"],
+  tekniske_produkter: ["energi_drift", "produkt_cirkularitet", "esg_data"],
+  foedevarer: ["energi_drift", "materialer_spild", "esg_data"],
+  produktion_agro: ["energi_drift", "materialer_spild", "produkt_cirkularitet"],
+  kemi_industri: ["materialer_spild", "esg_data", "klimakommunikation"],
+  kloak_miljoe: ["flaade_transport", "arbejdsmiljoe_social", "esg_data"],
+  tekstil_workwear: ["produkt_cirkularitet", "materialer_spild", "klimakommunikation"],
+};
+
+const defaultCenterConfigs = {
+  co2: { kind: "number", centerValue: 10, unit: "tons CO2e/år", direction: "higherBetter", centerText: "Score 6 svarer til en dokumenteret CO2-reduktion på ca. 10 tons CO2e pr. år." },
+  energi: { kind: "number", centerValue: 50000, unit: "kWh/år", direction: "higherBetter", centerText: "Score 6 svarer til en dokumenteret energireduktion på ca. 50.000 kWh pr. år." },
+  opex: { kind: "number", centerValue: 50000, unit: "kr./år", direction: "higherBetter", centerText: "Score 6 svarer til en årlig driftsøkonomisk forbedring på ca. 50.000 kr." },
+  tilbagebetaling: { kind: "number", centerValue: 36, unit: "måneder", direction: "lowerBetter", centerText: "Score 6 svarer til en tilbagebetalingstid på ca. 36 måneder." },
+  investering: { kind: "number", centerValue: 250000, unit: "kr. investering", direction: "lowerBetter", centerText: "Score 6 svarer til en betydelig, men håndterbar investering på ca. 250.000 kr." },
+  driftsforstyrrelse: { kind: "number", centerValue: 2, unit: "dages driftsstop", direction: "lowerBetter", centerText: "Score 6 svarer til en håndterbar driftsforstyrrelse på ca. 2 dage." },
+  braendstof: { kind: "number", centerValue: 5000, unit: "liter diesel/år", direction: "higherBetter", centerText: "Score 6 svarer til en dokumenteret reduktion på ca. 5.000 liter diesel pr. år." },
+  ressourcer: { kind: "number", centerValue: 1000, unit: "kg materialer/år", direction: "higherBetter", centerText: "Score 6 svarer til en materialereduktion på ca. 1.000 kg pr. år." },
+  affald: { kind: "number", centerValue: 1000, unit: "kg affald/år", direction: "higherBetter", centerText: "Score 6 svarer til en affaldsreduktion eller øget genanvendelse på ca. 1.000 kg pr. år." },
+  levetid: { kind: "number", centerValue: 12, unit: "måneders levetidsforlængelse", direction: "higherBetter", centerText: "Score 6 svarer til en gennemsnitlig levetidsforlængelse på ca. 12 måneder." },
+};
+
+const qualitativeCenterTexts = {
+  strategi: "Score 6 betyder, at initiativet understøtter virksomhedens ESG-struktur og strategi, men ikke er et krav eller en nøgleprioritet.",
+  kundevaerdi: "Score 6 betyder, at initiativet skaber tydelig værdi for nogle kunder, men ikke er afgørende for salg eller markedsadgang.",
+  kapacitet: "Score 6 betyder, at virksomheden har delvis erfaring og kan gennemføre initiativet med begrænset ekstern støtte.",
+  teknisk: "Score 6 betyder, at løsningen er afprøvet andre steder, men kræver tilpasning eller pilot i virksomheden.",
+  data: "Score 6 betyder, at der findes et rimeligt datagrundlag, men at dele af dokumentationen stadig skal forbedres.",
+  asset: "Score 6 betyder, at initiativet nogenlunde passer med eksisterende udskiftningsplaner, men ikke perfekt.",
+  infrastruktur: "Score 6 betyder, at infrastruktur kan etableres med almindelig planlægning og enkelte praktiske afklaringer.",
+  procesfit: "Score 6 betyder, at initiativet kræver tilpasninger, men kan rummes i den eksisterende proces.",
+  returflow: "Score 6 betyder, at der kan gennemføres pilot med udvalgte kunder, enkel sortering og manuel registrering.",
+  cirkulaer_model: "Score 6 betyder, at initiativet kan styrke forretningen, men endnu ikke er en fuld cirkulær forretningsmodel.",
+  sporbarhed: "Score 6 betyder, at sporbarhed er mulig for centrale data, men ikke fuldt integreret på produkt-, materiale- og kundeniveau.",
+  kildedokumentation: "Score 6 betyder, at centrale kilder er identificeret, men at sporbarhed og kvalitetssikring stadig skal forbedres.",
+  esrs: "Score 6 betyder, at data kan bruges i intern ESG-struktur, men kræver bearbejdning før ekstern rapportering.",
+  systematik: "Score 6 betyder, at dataflowet kan gentages, men stadig er delvist manuelt og personafhængigt.",
+  greenwashing: "Score 6 betyder, at udsagnet kan gøres ansvarligt, hvis det præciseres og dokumenteres bedre.",
+  kommunikationsvaerdi: "Score 6 betyder, at initiativet er relevant at kommunikere om, men ikke stærkt nok som selvstændig hovedfortælling.",
+  verificerbarhed: "Score 6 betyder, at udsagnet kan efterprøves internt, men kræver bedre dokumentation før ekstern kontrol.",
+  arbejdsmiljoe: "Score 6 betyder, at initiativet giver en konkret, men begrænset forbedring af arbejdsmiljø eller sikkerhed.",
+  kompetencer: "Score 6 betyder, at der kræves noget opkvalificering, men at initiativet kan løftes med eksisterende organisation.",
+  medarbejderaccept: "Score 6 betyder, at der forventes blandet, men håndterbar medarbejderaccept.",
+};
+
+function uniqueById(list) {
+  const map = new Map();
+  list.forEach((item) => map.set(item.id, item));
+  return Array.from(map.values());
+}
+
+function buildFactors(companyPackage, initiativeType, factorLimit) {
+  const boostedModules = industryBoosts[companyPackage] || [];
+  const direct = moduleFactors[initiativeType] || [];
+  const industry = boostedModules
+    .flatMap((id) => moduleFactors[id] || [])
+    .map((factor) => ({ ...factor, weight: factor.weight * 0.9 }));
+  const directIds = new Set(direct.map((factor) => factor.id));
+
+  return uniqueById([...coreFactors, ...direct, ...industry])
+    .sort((a, b) => {
+      const directA = directIds.has(a.id) ? 1 : 0;
+      const directB = directIds.has(b.id) ? 1 : 0;
+      if (directA !== directB) return directB - directA;
+      if (a.dim !== b.dim) return a.dim === "Værdi" ? -1 : 1;
+      return b.weight - a.weight;
+    })
+    .slice(0, factorLimit);
+}
+
+function getDefaultCenterConfig(factor) {
+  if (defaultCenterConfigs[factor.id]) return defaultCenterConfigs[factor.id];
+  return {
+    kind: "text",
+    centerText: qualitativeCenterTexts[factor.id] || `Score 6 betyder, at ${factor.name.toLowerCase()} er relevant og håndterbar, men ikke stærk eller transformativ.`,
+    direction: "higherBetter",
+  };
+}
+
+function formatNumber(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "0";
+  return new Intl.NumberFormat("da-DK", { maximumFractionDigits: 1 }).format(number);
+}
+
+function rangeText(from, to, unit) {
+  return `${formatNumber(from)}-${formatNumber(to)} ${unit}`;
+}
+
+function makeAbsoluteCenterText(factor, config) {
+  if (config.kind !== "number") {
+    return config.centerText || getDefaultCenterConfig(factor).centerText;
+  }
+
+  const centerValue = Math.max(0, Number(config.centerValue) || 0);
+  const unit = config.unit || "enheder";
+  const valueText = `${formatNumber(centerValue)} ${unit}`;
+
+  if (config.direction === "lowerBetter") {
+    return `Score 6 svarer til et håndterbart midterniveau på ca. ${valueText}. Lavere niveauer scorer højere, fordi byrden er mindre.`;
+  }
+
+  return `Score 6 svarer til en relevant og målbar effekt på ca. ${valueText}. Højere niveauer scorer højere, fordi effekten er større.`;
+}
+
+function makeCenterStatement(factor, config, anchorStyle) {
+  if (anchorStyle === "absolute") {
+    return makeAbsoluteCenterText(factor, config);
+  }
+
+  if (anchorStyle === "relative") {
+    return `Score 6 betyder, at ${factor.name.toLowerCase()} ligger på et relevant midterniveau i forhold til baseline, typisk en tydelig, men ikke markant, forbedring.`;
+  }
+
+  if (anchorStyle === "documentation") {
+    return `Score 6 betyder, at ${factor.name.toLowerCase()} kan forklares med et rimeligt datagrundlag, men at dokumentation, sporbarhed eller validering stadig bør forbedres.`;
+  }
+
+  return `Score 6 betyder, at ${factor.name.toLowerCase()} er relevant og vurderbar, men ikke stærk, kritisk eller transformativ.`;
+}
+
+function buildAbsoluteAnchors(factor, config) {
+  const centerText = makeCenterStatement(factor, config, "absolute");
+
+  if (config.kind !== "number") {
+    return {
+      0: `Klart under center: ${factor.anchor0}`,
+      3: "Svagt niveau. Der er kun begrænset effekt, modenhed eller dokumentation.",
+      6: centerText,
+      9: "Stærkt niveau. Initiativet ligger tydeligt over centerbeskrivelsen og kan forsvares med konkrete observationer.",
+      12: `Meget stærkt niveau: ${factor.anchor12}`,
+    };
+  }
+
+  const c = Math.max(0, Number(config.centerValue) || 0);
+  const unit = config.unit || "enheder";
+
+  if (config.direction === "lowerBetter") {
+    return {
+      0: `Meget tungt niveau: over ${formatNumber(c * 4)} ${unit}.`,
+      3: `Tungt niveau: ca. ${rangeText(c * 2, c * 4, unit)}.`,
+      6: centerText,
+      9: `Let niveau: ca. ${rangeText(c * 0.25, c * 0.5, unit)}.`,
+      12: `Meget let niveau: under ${formatNumber(c * 0.25)} ${unit} eller næsten ingen byrde.`,
+    };
+  }
+
+  return {
+    0: `Ingen, negativ eller udokumenteret effekt: under ${formatNumber(c * 0.1)} ${unit}.`,
+    3: `Lav effekt: ca. ${rangeText(c * 0.25, c * 0.75, unit)}.`,
+    6: centerText,
+    9: `Stærk effekt: ca. ${rangeText(c * 1.5, c * 2.5, unit)}.`,
+    12: `Meget stærk effekt: over ${formatNumber(c * 2.5)} ${unit}.`,
+  };
+}
+
+function buildRelativeAnchors(factor, config) {
+  const centerText = makeCenterStatement(factor, config, "relative");
+  return {
+    0: "Forværrer situationen eller flytter problemet til et andet sted.",
+    3: "Lille forbedring i forhold til baseline, typisk under 5 %, eller usikker effekt.",
+    6: centerText,
+    9: "Tydelig forbedring i forhold til baseline, typisk 15-30 %, med rimeligt datagrundlag.",
+    12: "Meget stor forbedring i forhold til baseline, typisk over 30 %, eller transformativ effekt.",
+  };
+}
+
+function buildGeneralAnchors(factor, config) {
+  const centerText = makeCenterStatement(factor, config, "general");
+  return {
+    0: "Negativ, uønsket eller ikke relevant effekt. Initiativet bør som udgangspunkt ikke prioriteres i denne form.",
+    3: "Svagt eller usikkert niveau. Effekten eller gennemførligheden er begrænset og kræver væsentlig afklaring.",
+    6: centerText,
+    9: "Stærkt niveau. Initiativet er tydeligt relevant og sandsynligvis værd at prioritere.",
+    12: "Meget stærkt niveau. Initiativet er ekstraordinært relevant, værdiskabende eller enkelt at gennemføre.",
+  };
+}
+
+function buildDocumentationAnchors(factor, config) {
+  const centerText = makeCenterStatement(factor, config, "documentation");
+  return {
+    0: "Kan ikke dokumenteres eller vil være risikabelt at bruge som beslutnings- eller kommunikationsgrundlag.",
+    3: "Bygger mest på antagelser. Kræver væsentlig datavalidering før scoren kan bruges.",
+    6: centerText,
+    9: "Godt dokumenteret. Centrale antagelser, kilder og beregninger kan forklares.",
+    12: "Stærkt dokumenteret. Scoren kan efterprøves, genberegnes og forklares over for kunde, ledelse eller ekstern part.",
+  };
+}
+
+function buildAnchors(factor, config, anchorStyle) {
+  if (anchorStyle === "relative") return buildRelativeAnchors(factor, config);
+  if (anchorStyle === "documentation") return buildDocumentationAnchors(factor, config);
+  if (anchorStyle === "general") return buildGeneralAnchors(factor, config);
+  return buildAbsoluteAnchors(factor, config);
+}
+
+function defaultScores(factors) {
+  const out = {};
+  factors.forEach((factor) => {
+    out[factor.id] = { low: null, high: null, confidence: 2, assumption: "", touched: false };
+  });
+  return out;
+}
+
+function isScoreValue(value) {
+  return Number.isFinite(value);
+}
+
+function normalizeScoreRange(score) {
+  const low = isScoreValue(score.low) ? score.low : null;
+  const high = isScoreValue(score.high) ? score.high : null;
+
+  if (low === null || high === null) {
+    return { ...score, low: null, high: null, touched: false };
+  }
+
+  return { ...score, low: Math.min(low, high), high: Math.max(low, high), touched: score.touched !== false };
+}
+
+function applyBoundScore(current, field, nextValue) {
+  const score = normalizeScoreRange(current || { low: null, high: null, confidence: 2, assumption: "", touched: false });
+
+  if (!score.touched) {
+    return { ...score, low: nextValue, high: nextValue, touched: true };
+  }
+
+  if (field === "low") return normalizeScoreRange({ ...score, low: nextValue, high: Math.max(score.high, nextValue), touched: true });
+  if (field === "high") return normalizeScoreRange({ ...score, low: Math.min(score.low, nextValue), high: nextValue, touched: true });
+  return score;
+}
+
+function applyAnchorClick(current, nextValue) {
+  const score = normalizeScoreRange(current || { low: null, high: null, confidence: 2, assumption: "", touched: false });
+
+  if (!score.touched) {
+    return { ...score, low: nextValue, high: nextValue, touched: true };
+  }
+
+  if (score.low === score.high) {
+    if (score.low === nextValue) {
+      return { ...score, low: null, high: null, touched: false };
+    }
+    return { ...score, low: Math.min(score.low, nextValue), high: Math.max(score.high, nextValue), touched: true };
+  }
+
+  if (nextValue < score.low) {
+    return { ...score, low: nextValue, high: score.high, touched: true };
+  }
+
+  if (nextValue > score.high) {
+    return { ...score, low: score.low, high: nextValue, touched: true };
+  }
+
+  return { ...score, low: nextValue, high: nextValue, touched: true };
+}
+
+function bestScore(score) {
+  const normalized = normalizeScoreRange(score || { low: null, high: null, touched: false });
+  if (!normalized.touched) return null;
+  return Math.round(((normalized.low + normalized.high) / 2) * 10) / 10;
+}
+
+function weightedAverage(factors, scores, dim, field = "best") {
+  const selected = factors
+    .filter((factor) => factor.dim === dim)
+    .map((factor) => ({ factor, score: normalizeScoreRange(scores[factor.id] || { low: null, high: null, touched: false }) }))
+    .filter(({ score }) => score.touched);
+
+  const weightSum = selected.reduce((sum, item) => sum + item.factor.weight, 0);
+  if (selected.length === 0 || weightSum === 0) return null;
+
+  return selected.reduce((sum, item) => {
+    const value = field === "best" ? bestScore(item.score) : item.score[field];
+    return sum + (Number.isFinite(value) ? value : 0) * item.factor.weight;
+  }, 0) / weightSum;
+}
+
+function scoreStatus(value, feasibility, confidence) {
+  if (!Number.isFinite(value) && !Number.isFinite(feasibility)) return { label: "Ikke scoret endnu", tone: "gray" };
+  if (!Number.isFinite(value)) return { label: "Mangler værdiscore", tone: "amber" };
+  if (!Number.isFinite(feasibility)) return { label: "Mangler gennemførlighedsscore", tone: "amber" };
+  if (confidence < 2.2) return { label: "Interessant, men datagrundlag er svagt", tone: "amber" };
+  if (value >= 8 && feasibility >= 8) return { label: "Stærk kandidat", tone: "green" };
+  if (value >= 8 && feasibility < 6) return { label: "Høj værdi - kræver afklaring", tone: "amber" };
+  if (value < 6 && feasibility >= 8) return { label: "Let at gennemføre - men lav værdi", tone: "gray" };
+  if (value < 6 && feasibility < 6) return { label: "Lav prioritet", tone: "red" };
+  return { label: "Relevant til sammenligning", tone: "blue" };
+}
+
+function displayScore(value, digits = 1) {
+  return Number.isFinite(value) ? value.toFixed(digits) : "-";
+}
+
+function displayRawScore(value) {
+  return Number.isFinite(value) ? value : "-";
+}
+
+function runPrototypeTests() {
+  const nyboFactors = buildFactors("tekstil_workwear", "produkt_cirkularitet", 12);
+  console.assert(nyboFactors.length <= 12, "buildFactors respects factor limit");
+  console.assert(nyboFactors.some((factor) => factor.id === "returflow"), "Nybo circularity includes take-back factor");
+  console.assert(uniqueById([{ id: "a" }, { id: "a" }, { id: "b" }]).length === 2, "uniqueById removes duplicate IDs");
+  const scores = defaultScores(nyboFactors);
+  console.assert(weightedAverage(nyboFactors, scores, "Værdi", "best") === null, "default value average is not calculated before scoring");
+  console.assert(weightedAverage(nyboFactors, scores, "Gennemførlighed", "best") === null, "default feasibility average is not calculated before scoring");
+  console.assert(scoreStatus(9, 9, 4).tone === "green", "high value and feasibility gives green status");
+  console.assert(normalizeScoreRange({ low: 9, high: 3, touched: true }).low === 3, "score ranges are normalized");
+  console.assert(applyBoundScore({ low: 3, high: 6, touched: true }, "low", 9).high === 9, "setting low above high moves high with it");
+  console.assert(applyBoundScore({ low: 6, high: 9, touched: true }, "high", 3).low === 3, "setting high below low moves low with it");
+  console.assert(applyAnchorClick({ low: null, high: null, touched: false }, 9).low === 9, "first anchor click sets low to selected score");
+  console.assert(applyAnchorClick({ low: null, high: null, touched: false }, 9).high === 9, "first anchor click sets high to selected score");
+  console.assert(applyAnchorClick({ low: 6, high: 6, touched: true }, 6).touched === false, "clicking a single selected score deselects it");
+  console.assert(applyAnchorClick({ low: 6, high: 6, touched: true }, 9).low === 6, "second different anchor click creates interval low");
+  console.assert(applyAnchorClick({ low: 6, high: 6, touched: true }, 9).high === 9, "second different anchor click creates interval high");
+  console.assert(applyAnchorClick({ low: 3, high: 9, touched: true }, 6).low === 6, "click inside interval collapses to single score low");
+  console.assert(applyAnchorClick({ low: 3, high: 9, touched: true }, 6).high === 6, "click inside interval collapses to single score high");
+  console.assert(applyAnchorClick({ low: 3, high: 9, touched: true }, 0).low === 0, "click below interval extends low boundary");
+  console.assert(applyAnchorClick({ low: 3, high: 9, touched: true }, 0).high === 9, "click below interval keeps high boundary");
+  console.assert(applyAnchorClick({ low: 3, high: 9, touched: true }, 12).low === 3, "click above interval keeps low boundary");
+  console.assert(applyAnchorClick({ low: 3, high: 9, touched: true }, 12).high === 12, "click above interval extends high boundary");
+  console.assert(buildFactors("unknown", "unknown", 20).length === coreFactors.length, "unknown config falls back to core factors");
+  console.assert(companies.some((company) => company.id === "business_viborg"), "Business Viborg is available as an organization");
+  console.assert(buildFactors("erhvervsfremme_netvaerk", "esg_data", 12).some((factor) => factor.id === "kildedokumentation"), "Business Viborg configuration includes ESG data factors");
+  console.assert(weightedAverage([], {}, "Værdi", "best") === null, "empty factor list returns null average before scoring");
+  console.assert(loadSavedWorkshopState() === null || typeof loadSavedWorkshopState() === "object", "local storage loader returns null or state object");
+  const absolute = buildAbsoluteAnchors({ id: "co2", anchor0: "x", anchor12: "y" }, { kind: "number", centerValue: 10, unit: "tons", direction: "higherBetter", centerText: "Score 6 er 10 tons." }, "absolute");
+  console.assert(absolute[6].includes("10 tons"), "absolute anchors use score 6 center text");
+  const relativeCenter = buildRelativeAnchors({ id: "co2", name: "CO2- og miljøeffekt", anchor0: "x", anchor12: "y" }, { kind: "number", centerValue: 10, unit: "tons", direction: "higherBetter" });
+  console.assert(!relativeCenter[6].includes("10 tons"), "relative score 6 statement follows the selected description logic");
+  const generalCenter = buildGeneralAnchors({ id: "co2", name: "CO2- og miljøeffekt", anchor0: "x", anchor12: ">30 % forbedring" }, { kind: "number", centerValue: 10, unit: "tons", direction: "higherBetter" });
+  console.assert(!generalCenter[6].includes("10 tons"), "general score 6 statement does not expose absolute calibration");
+  console.assert(!generalCenter[12].includes("30"), "general score 12 statement does not reuse percentage-based factor anchor text");
+  console.assert(DATA_CONFIDENCE_DESCRIPTIONS[2].includes("Svagt"), "data confidence score 2 has a description");
+  console.assert(absolute[12].includes("25"), "absolute higher-better score 12 follows automatically from center value");
+  const investment = buildAbsoluteAnchors({ id: "investering", anchor0: "x", anchor12: "y" }, { kind: "number", centerValue: 100000, unit: "kr.", direction: "lowerBetter", centerText: "Score 6 er 100.000 kr." }, "absolute");
+  console.assert(investment[12].includes("under"), "lower-better absolute anchors invert the scale");
+}
+
+runPrototypeTests();
+
+function Card({ children, className = "" }) {
+  return <section className={`rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 ${className}`}>{children}</section>;
+}
+
+function CardContent({ children, className = "" }) {
+  return <div className={className}>{children}</div>;
+}
+
+function Badge({ children, tone = "slate", className = "" }) {
+  const tones = {
+    slate: "bg-slate-100 text-slate-700 ring-slate-200",
+    dark: "bg-slate-900 text-white ring-slate-900",
+    blue: "bg-sky-50 text-sky-800 ring-sky-200",
+    green: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+    amber: "bg-amber-50 text-amber-800 ring-amber-200",
+    red: "bg-rose-50 text-rose-800 ring-rose-200",
+  };
+  return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${tones[tone] || tones.slate} ${className}`}>{children}</span>;
+}
+
+function Icon({ label }) {
+  return <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">{label}</span>;
+}
+
+function SelectField({ label, value, onChange, options, hint }) {
+  return (
+    <div className="space-y-2">
+      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</label>
+      <select
+        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {options.map((item) => (
+          <option key={item.id} value={item.id}>{item.name}</option>
+        ))}
+      </select>
+      <p className="text-xs text-slate-500">{hint}</p>
+    </div>
+  );
+}
+
+function ScoreTargetButton({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-xl px-3 py-2 text-sm font-medium ring-1 transition ${active ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ScoreAnchorButton({ level, text, selectedLow, selectedHigh, onClick }) {
+  const selected = selectedLow || selectedHigh;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group flex min-h-32 flex-col rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${selected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white hover:border-slate-400"}`}
+    >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className={`text-2xl font-semibold ${selected ? "text-white" : "text-slate-900"}`}>{level}</span>
+        <span className="flex gap-1">
+          {selectedLow && selectedHigh && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${selected ? "bg-white text-slate-900" : "bg-slate-100 text-slate-800"}`}>Valgt</span>}
+          {selectedLow && !selectedHigh && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${selected ? "bg-white text-slate-900" : "bg-sky-100 text-sky-800"}`}>Lav</span>}
+          {selectedHigh && !selectedLow && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${selected ? "bg-white text-slate-900" : "bg-emerald-100 text-emerald-800"}`}>Høj</span>}
+        </span>
+      </div>
+      <span className={`text-xs leading-relaxed ${selected ? "text-slate-100" : "text-slate-600"}`}>{text}</span>
+    </button>
+  );
+}
+
+function CenterConfigEditor({ factor, config, anchorStyle, currentCenterStatement, onChange }) {
+  const isNumber = config.kind === "number";
+  const showAbsoluteCalibration = isNumber && anchorStyle === "absolute";
+  return (
+    <div className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Score 6-niveau</div>
+          <div className="text-xs text-slate-500">Score 6 er centerpunktet. Talgrænsen bruges kun i absolutte scoregrænser. I de andre beskrivelseslogikker vises center som kvalitativ tekst.</div>
+        </div>
+        <Badge tone={isNumber ? "green" : "amber"}>{isNumber ? "Talgrænse" : "Kvalitativ"}</Badge>
+      </div>
+      {showAbsoluteCalibration ? (
+        <div className="grid gap-2 md:grid-cols-[1fr_1fr]">
+          <label className="space-y-1">
+            <span className="text-xs text-slate-500">Score 6 tal</span>
+            <input
+              type="number"
+              min="0"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2"
+              value={config.centerValue}
+              onChange={(event) => onChange({ ...config, centerValue: Number(event.target.value) })}
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs text-slate-500">Enhed</span>
+            <input
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2"
+              value={config.unit}
+              onChange={(event) => onChange({ ...config, unit: event.target.value })}
+            />
+          </label>
+        </div>
+      ) : isNumber ? (
+        <div className="rounded-xl bg-white p-3 text-xs leading-relaxed text-slate-600 ring-1 ring-slate-200">
+          Der findes en absolut kalibrering for denne faktor, men den skjules her, fordi den valgte beskrivelseslogik ikke bruger konkrete tal. Skift til <span className="font-semibold">Absolutte scoregrænser</span> for at redigere score 6-tal og enhed.
+        </div>
+      ) : (
+        <label className="space-y-1">
+          <span className="text-xs text-slate-500">Kvalitativ centerbeskrivelse</span>
+          <textarea
+            className="min-h-20 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none ring-slate-300 focus:ring-2"
+            value={config.centerText || ""}
+            onChange={(event) => onChange({ ...config, centerText: event.target.value })}
+          />
+        </label>
+      )}
+      <div className="mt-3 rounded-xl bg-white p-3 text-xs leading-relaxed text-slate-700 ring-1 ring-slate-200">
+        <span className="font-semibold">Aktuel score 6-sætning ({anchorStyleOptions.find((item) => item.id === anchorStyle)?.name || "valgt logik"}): </span>
+        {currentCenterStatement}
+      </div>
+    </div>
+  );
+}
+
+export default function BuviScoringPrototype() {
+  const savedState = useMemo(() => loadSavedWorkshopState(), []);
+  const [companyId, setCompanyId] = useState(savedState?.companyId || "nybo");
+  const [initiativeType, setInitiativeType] = useState(savedState?.initiativeType || "produkt_cirkularitet");
+  const [maturity, setMaturity] = useState(savedState?.maturity || "workshop");
+  const [initiativeName, setInitiativeName] = useState(savedState?.initiativeName || "Take-back og reparation af arbejdstøj for udvalgte kunder");
+  const [anchorStyle, setAnchorStyle] = useState(savedState?.anchorStyle || "absolute");
+  const [centerConfigs, setCenterConfigs] = useState(savedState?.centerConfigs || {});
+  const [savedAt, setSavedAt] = useState(savedState?.savedAt || null);
+  const [storageStatus, setStorageStatus] = useState(savedState ? "Indlæst fra denne browser" : "Ikke gemt endnu");
+  const [resetCounter, setResetCounter] = useState(0);
+
+  const company = companies.find((item) => item.id === companyId) || companies[0];
+  const maturityOption = maturityOptions.find((item) => item.id === maturity) || maturityOptions[1];
+  const directType = initiativeTypes.find((item) => item.id === initiativeType) || initiativeTypes[0];
+  const activeAnchorStyle = anchorStyleOptions.find((item) => item.id === anchorStyle) || anchorStyleOptions[0];
+
+  const factors = useMemo(
+    () => buildFactors(company.package, initiativeType, maturityOption.factorLimit),
+    [company.package, initiativeType, maturityOption.factorLimit, resetCounter]
+  );
+
+  const initialScores = useMemo(() => defaultScores(factors), [factors]);
+  const [scores, setScores] = useState(savedState?.scores || initialScores);
+  const [overallNotes, setOverallNotes] = useState(savedState?.overallNotes || "");
+
+  React.useEffect(() => {
+    if (resetCounter > 0) {
+      setScores(defaultScores(factors));
+      setOverallNotes("");
+      setStorageStatus("Scoring nulstillet lokalt i denne session");
+      return;
+    }
+
+    setScores((prev) => ({ ...defaultScores(factors), ...prev }));
+  }, [factors, resetCounter]);
+
+  React.useEffect(() => {
+    const state = {
+      companyId,
+      initiativeType,
+      maturity,
+      initiativeName,
+      anchorStyle,
+      centerConfigs,
+      scores,
+      overallNotes,
+    };
+    const ok = saveWorkshopState(state);
+    const timestamp = new Date().toISOString();
+    if (ok) {
+      setSavedAt(timestamp);
+      setStorageStatus("Gemt lokalt i denne browser");
+    } else {
+      setStorageStatus("Kunne ikke gemme lokalt i browseren");
+    }
+  }, [companyId, initiativeType, maturity, initiativeName, anchorStyle, centerConfigs, scores, overallNotes]);
+
+  const getCenterConfig = (factor) => ({ ...getDefaultCenterConfig(factor), ...(centerConfigs[factor.id] || {}) });
+
+  const updateCenterConfig = (factorId, nextConfig) => {
+    setCenterConfigs((prev) => ({ ...prev, [factorId]: nextConfig }));
+  };
+
+  const setScore = (factorId, field, nextValue) => {
+    setScores((prev) => {
+      const current = prev[factorId] || { low: null, high: null, confidence: 2, assumption: "", touched: false };
+      const updated = field === "confidence"
+        ? { ...current, confidence: nextValue }
+        : field === "anchor"
+          ? applyAnchorClick(current, nextValue)
+          : applyBoundScore(current, field, nextValue);
+      return { ...prev, [factorId]: updated };
+    });
+  };
+
+  const valueBest = weightedAverage(factors, scores, "Værdi", "best");
+  const feasibilityBest = weightedAverage(factors, scores, "Gennemførlighed", "best");
+  const valueLow = weightedAverage(factors, scores, "Værdi", "low");
+  const valueHigh = weightedAverage(factors, scores, "Værdi", "high");
+  const feasibilityLow = weightedAverage(factors, scores, "Gennemførlighed", "low");
+  const feasibilityHigh = weightedAverage(factors, scores, "Gennemførlighed", "high");
+  const confidence = factors.length ? factors.reduce((sum, factor) => sum + ((scores[factor.id] && scores[factor.id].confidence) || 1), 0) / factors.length : 0;
+  const status = scoreStatus(valueBest, feasibilityBest, confidence);
+  const roiProxy = Number.isFinite(valueBest) && Number.isFinite(feasibilityBest) ? valueBest * feasibilityBest : null;
+
+  const hasMatrixScore = Number.isFinite(valueBest) && Number.isFinite(feasibilityBest);
+  const hasMatrixRange = Number.isFinite(valueLow) && Number.isFinite(valueHigh) && Number.isFinite(feasibilityLow) && Number.isFinite(feasibilityHigh);
+  const pointX = hasMatrixScore ? Math.min(92, Math.max(8, (feasibilityBest / 12) * 84 + 8)) : null;
+  const pointY = hasMatrixScore ? Math.min(92, Math.max(8, 100 - ((valueBest / 12) * 84 + 8))) : null;
+  const rectX = hasMatrixRange ? Math.min((feasibilityLow / 12) * 84 + 8, (feasibilityHigh / 12) * 84 + 8) : null;
+  const rectY = hasMatrixRange ? Math.min(100 - ((valueHigh / 12) * 84 + 8), 100 - ((valueLow / 12) * 84 + 8)) : null;
+  const rectW = hasMatrixRange ? Math.abs(((feasibilityHigh - feasibilityLow) / 12) * 84) : null;
+  const rectH = hasMatrixRange ? Math.abs(((valueHigh - valueLow) / 12) * 84) : null;
+
+  const statusClass = {
+    green: "bg-emerald-50 ring-emerald-200",
+    amber: "bg-amber-50 ring-amber-200",
+    red: "bg-rose-50 ring-rose-200",
+    gray: "bg-slate-50 ring-slate-200",
+    blue: "bg-sky-50 ring-sky-200",
+  }[status.tone] || "bg-sky-50 ring-sky-200";
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-6 text-slate-900">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <Badge>BUVI prototype</Badge>
+              <Badge>OxF scoringsværktøj v0.2</Badge>
+              <Badge tone="green">Anchor-baseret scoring</Badge>
+            </div>
+            <h1 className="text-3xl font-semibold tracking-tight">Konfigurerbart scoringsværktøj</h1>
+            <p className="mt-2 max-w-3xl text-sm text-slate-600">
+              Vælg virksomhed, initiativtype og scorebeskrivelser. Brugeren klikker på den anchor statement, der passer bedst, og tallet følger automatisk med.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => setResetCounter((value) => value + 1)}
+              className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
+            >
+              Nulstil scoring
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                clearSavedWorkshopState();
+                setScores(defaultScores(factors));
+                setOverallNotes("");
+                setCenterConfigs({});
+                setSavedAt(null);
+                setStorageStatus("Lokal browserdata er slettet");
+              }}
+              className="rounded-2xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              Slet lokal data
+            </button>
+          </div>
+        </header>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-2 text-sm text-slate-700 md:flex-row md:items-center md:justify-between">
+              <div>
+                <span className="font-semibold">Lokal lagring:</span> {storageStatus}. Dine scoringer gemmes kun i denne browser på denne computer og sendes ikke til GitHub, Business Viborg eller underviser.
+              </div>
+              <div className="text-xs text-slate-500">
+                {savedAt ? `Senest gemt: ${new Date(savedAt).toLocaleString("da-DK")}` : "Ingen gemt tidsstempel endnu"}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4 lg:grid-cols-4">
+          <Card className="lg:col-span-3">
+            <CardContent className="p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <Icon label="1" />
+                <h2 className="text-lg font-semibold">1. Konfiguration</h2>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <SelectField label="Virksomhed" value={companyId} onChange={setCompanyId} options={companies} hint={company.label} />
+                <SelectField label="Initiativtype" value={initiativeType} onChange={setInitiativeType} options={initiativeTypes} hint={directType.hint} />
+                <SelectField label="Beslutningsniveau" value={maturity} onChange={setMaturity} options={maturityOptions} hint={maturityOption.hint} />
+                <div className="space-y-2">
+                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Initiativ</label>
+                  <input
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2"
+                    value={initiativeName}
+                    onChange={(event) => setInitiativeName(event.target.value)}
+                  />
+                  <p className="text-xs text-slate-500">Bruges som casebeskrivelse i workshoppen.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <Icon label="M" />
+                <h2 className="text-lg font-semibold">Motoren vælger</h2>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="rounded-xl bg-slate-100 p-3">
+                  <div className="text-xs text-slate-500">Branchepakke</div>
+                  <div className="font-medium">{company.package}</div>
+                </div>
+                <div className="rounded-xl bg-slate-100 p-3">
+                  <div className="text-xs text-slate-500">Faktorer i skema</div>
+                  <div className="font-medium">{factors.length} faktorer</div>
+                </div>
+                <div className="rounded-xl bg-slate-100 p-3">
+                  <div className="text-xs text-slate-500">Moduler</div>
+                  <div className="font-medium">Kerne + branche + initiativtype</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardContent className="p-5">
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <Icon label="2" />
+                  <h2 className="text-lg font-semibold">2. Beskrivelseslogik for score-niveauer</h2>
+                </div>
+                <p className="max-w-3xl text-sm text-slate-600">
+                  Her vælger du, hvordan score 0, 3, 6, 9 og 12 skal beskrives. Ved absolutte scoregrænser angiver du kun score 6-niveauet for hver faktor. Prototypen danner automatisk de øvrige anchor statements ud fra center-niveauet.
+                </p>
+              </div>
+              <div className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-700 lg:max-w-md">
+                <span className="font-semibold">Sådan scorer du:</span> Ingen score er valgt fra start. Klik på én scorebeskrivelse for ét samlet skøn. Klik på den valgte igen for at vælge den fra. Klik på en anden score for at danne et lavt-højt interval. Klik uden for intervallet for at udvide lav/høj grænsen; klik inde i intervallet for at samle vurderingen på én score.
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {anchorStyleOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setAnchorStyle(option.id)}
+                  className={`rounded-2xl p-4 text-left ring-1 transition hover:-translate-y-0.5 hover:shadow-sm ${anchorStyle === option.id ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-800 ring-slate-200"}`}
+                >
+                  <div className="font-semibold">{option.name}</div>
+                  <div className={`mt-2 text-xs leading-relaxed ${anchorStyle === option.id ? "text-slate-100" : "text-slate-500"}`}>{option.hint}</div>
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 rounded-2xl bg-slate-100 p-4 text-sm text-slate-700">
+              <span className="font-semibold">Aktiv logik:</span> {activeAnchorStyle.name}. <span className="text-slate-500">Scoren kan også stå tom. En tom faktor tæller ikke med i resultatberegningen.</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4 xl:grid-cols-3">
+          <Card className="xl:col-span-2">
+            <CardContent className="p-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Icon label="3" />
+                  <h2 className="text-lg font-semibold">3. Genereret scoringsskema</h2>
+                </div>
+                <Badge>0 - 3 - 6 - 9 - 12</Badge>
+              </div>
+
+              <div className="space-y-5">
+                {factors.map((factor) => {
+                  const score = normalizeScoreRange(scores[factor.id] || { low: null, high: null, confidence: 2, assumption: "", touched: false });
+                  const centerConfig = getCenterConfig(factor);
+                  const anchors = buildAnchors(factor, centerConfig, anchorStyle);
+                  const best = bestScore(score);
+                  return (
+                    <article key={factor.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge tone={factor.dim === "Værdi" ? "dark" : "blue"}>{factor.dim}</Badge>
+                            <h3 className="font-semibold">{factor.name}</h3>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                            {factor.tags.slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)}
+                          </div>
+                        </div>
+                        <div className="grid min-w-64 grid-cols-3 gap-2 text-center text-xs">
+                          <div className="rounded-xl bg-sky-50 p-2 ring-1 ring-sky-200"><div className="text-slate-500">Lav</div><div className="text-lg font-semibold text-sky-900">{displayRawScore(score.low)}</div></div>
+                          <div className="rounded-xl bg-slate-50 p-2 ring-1 ring-slate-200"><div className="text-slate-500">Bedste bud</div><div className="text-lg font-semibold">{displayRawScore(best)}</div></div>
+                          <div className="rounded-xl bg-emerald-50 p-2 ring-1 ring-emerald-200"><div className="text-slate-500">Høj</div><div className="text-lg font-semibold text-emerald-900">{displayRawScore(score.high)}</div></div>
+                        </div>
+                      </div>
+
+                      <CenterConfigEditor
+                        factor={factor}
+                        config={centerConfig}
+                        anchorStyle={anchorStyle}
+                        currentCenterStatement={anchors[6]}
+                        onChange={(nextConfig) => updateCenterConfig(factor.id, nextConfig)}
+                      />
+
+                      <div className="mt-4 grid gap-3 md:grid-cols-5">
+                        {SCORE_LEVELS.map((level) => (
+                          <ScoreAnchorButton
+                            key={level}
+                            level={level}
+                            text={anchors[level]}
+                            selectedLow={score.touched && score.low === level}
+                            selectedHigh={score.touched && score.high === level}
+                            onClick={() => setScore(factor.id, "anchor", level)}
+                          />
+                        ))}
+                      </div>
+
+                      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_2fr]">
+                        <div>
+                          <div className="mb-1 flex justify-between text-xs"><span>Datagrundlag</span><span>{score.confidence}/5</span></div>
+                          <input
+                            type="range"
+                            min="1"
+                            max="5"
+                            step="1"
+                            value={score.confidence}
+                            onChange={(event) => setScore(factor.id, "confidence", Number(event.target.value))}
+                            className="w-full accent-slate-900"
+                          />
+                          <div className="mt-2 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-700 ring-1 ring-slate-200">
+                            {DATA_CONFIDENCE_DESCRIPTIONS[score.confidence]}
+                          </div>
+                        </div>
+                        <textarea
+                          className="min-h-16 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none ring-slate-300 focus:ring-2"
+                          placeholder="Antagelser eller databehov for denne faktor..."
+                          value={score.assumption || ""}
+                          onChange={(event) => setScores((prev) => ({ ...prev, [factor.id]: { ...score, assumption: event.target.value } }))}
+                        />
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-4">
+            <Card>
+              <CardContent className="p-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <Icon label="4" />
+                  <h2 className="text-lg font-semibold">4. Resultat</h2>
+                </div>
+                <div className="space-y-3">
+                  <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                    <div className="text-xs uppercase tracking-wide text-slate-500">Initiativ</div>
+                    <div className="mt-1 font-medium">{initiativeName}</div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                      <div className="text-xs text-slate-500">Værdi</div>
+                      <div className="text-3xl font-semibold">{displayScore(valueBest)}</div>
+                      <div className="text-xs text-slate-500">Interval {displayScore(valueLow)}-{displayScore(valueHigh)}</div>
+                    </div>
+                    <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                      <div className="text-xs text-slate-500">Gennemførlighed</div>
+                      <div className="text-3xl font-semibold">{displayScore(feasibilityBest)}</div>
+                      <div className="text-xs text-slate-500">Interval {displayScore(feasibilityLow)}-{displayScore(feasibilityHigh)}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xs text-slate-500">ROI-proxy</div>
+                        <div className="text-2xl font-semibold">{Number.isFinite(roiProxy) ? roiProxy.toFixed(0) : "-"}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-500">Datagrundlag</div>
+                        <div className="text-2xl font-semibold">{confidence.toFixed(1)}/5</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className={`rounded-2xl p-4 ring-1 ${statusClass}`}>
+                    <div className="flex items-start gap-2">
+                      <Icon label={status.tone === "green" ? "OK" : "i"} />
+                      <div>
+                        <div className="font-semibold">{status.label}</div>
+                        <div className="text-sm text-slate-600">Scoren er et beslutningsstøtteværktøj, ikke en automatisk beslutning.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-5">
+                <h2 className="mb-3 text-lg font-semibold">Værdi vs. gennemførlighed</h2>
+                <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+                  <svg viewBox="0 0 100 100" className="h-72 w-full" role="img" aria-label="Matrix med værdi på y-aksen og gennemførlighed på x-aksen">
+                    <rect x="8" y="8" width="84" height="84" rx="3" fill="white" stroke="#cbd5e1" />
+                    <line x1="8" y1="50" x2="92" y2="50" stroke="#e2e8f0" />
+                    <line x1="50" y1="8" x2="50" y2="92" stroke="#e2e8f0" />
+                    <path d="M 14 86 C 24 64, 40 48, 58 35 C 72 25, 82 18, 90 14" fill="none" stroke="#cbd5e1" strokeDasharray="3 3" />
+                    {hasMatrixRange && <rect x={rectX} y={rectY} width={Math.max(2, rectW)} height={Math.max(2, rectH)} rx="2" fill="#bfdbfe" opacity="0.55" stroke="#60a5fa" />}
+                    {hasMatrixScore && <circle cx={pointX} cy={pointY} r="3.3" fill="#0f172a" />}
+                    {!hasMatrixScore && <text x="50" y="51" fontSize="4" textAnchor="middle" fill="#94a3b8">Ingen score valgt endnu</text>}
+                    <text x="50" y="98" fontSize="4" textAnchor="middle" fill="#475569">Gennemførlighed</text>
+                    <text x="2" y="52" fontSize="4" textAnchor="middle" fill="#475569" transform="rotate(-90 2 52)">Værdi</text>
+                    <text x="11" y="14" fontSize="3" fill="#94a3b8">Høj værdi</text>
+                    <text x="65" y="89" fontSize="3" fill="#94a3b8">Let at gennemføre</text>
+                  </svg>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <Icon label="!" />
+                  <h2 className="text-lg font-semibold">Gates og næste skridt</h2>
+                </div>
+                <div className="space-y-2 text-sm">
+                  {confidence < 3 && <div className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">Datagrundlaget er lavt: brug resultatet til dialog og databehov, ikke ekstern kommunikation.</div>}
+                  {factors.some((factor) => factor.id === "greenwashing" && ((scores[factor.id] && bestScore(scores[factor.id])) || 12) < 6) && <div className="rounded-xl bg-rose-50 p-3 ring-1 ring-rose-200">Greenwashing-gate: grønne udsagn bør ikke publiceres før dokumentation og formulering er forbedret.</div>}
+                  {Number.isFinite(valueBest) && Number.isFinite(feasibilityBest) && valueBest >= 8 && feasibilityBest < 6 && <div className="rounded-xl bg-sky-50 p-3 ring-1 ring-sky-200">Høj værdi, lav gennemførlighed: lav en afklaringsplan for investering, drift og kompetencer.</div>}
+                  {Number.isFinite(valueBest) && Number.isFinite(feasibilityBest) && valueBest >= 7 && feasibilityBest >= 7 && confidence >= 3 && <div className="rounded-xl bg-emerald-50 p-3 ring-1 ring-emerald-200">God kandidat: gå videre med business case eller pilot.</div>}
+                  <textarea
+                    className="mt-3 min-h-24 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none ring-slate-300 focus:ring-2"
+                    placeholder="Notér samlet beslutning, manglende data eller næste beslutningspunkt..."
+                    value={overallNotes}
+                    onChange={(event) => setOverallNotes(event.target.value)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
