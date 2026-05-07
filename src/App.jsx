@@ -12,6 +12,40 @@ const DATA_CONFIDENCE_DESCRIPTIONS = {
 
 const STORAGE_KEY = "buvi-scoretool-workshop-v1";
 
+const BRANDING = {
+  organization: {
+    name: "ProBalance ApS",
+    shortName: "ProBalance",
+    website: "https://probalance.dk",
+    logo: {
+      src: "probalance-logo.png",
+      alt: "ProBalance logo",
+      fallbackText: "ProBalance",
+      note: "Læg højopløst logo i public/probalance-logo.png. Alternativt kan src ændres til /probalance-logo.svg, hvis logoet findes som SVG.",
+    },
+  },
+  facilitator: {
+    name: "Christian Rasmussen",
+    title: "Bæredygtighed, forretningsudvikling og AI-understøttede workshopværktøjer",
+    email: "christian@probalance.dk",
+    phone: "+45 20 31 01 65",
+    phoneRaw: "+4520310165",
+    linkedin: "https://www.linkedin.com/in/rasmussen-christian",
+  },
+  tool: {
+    name: "BUVI/OxF scoringsværktøj",
+    subtitle: "Konfigurerbart workshopværktøj til vurdering af bæredygtighedsinitiativer",
+    version: "v0.2.7-branding",
+    context: "Udviklet til workshopbrug i BUVI bæredygtighedsnetværket",
+  },
+  output: {
+    preparedByLabel: "Udarbejdet af",
+    contactLabel: "Kontakt",
+    confidentialityNote: "Vurderingen er et workshopbaseret beslutningsgrundlag. Data gemmes lokalt i brugerens browser og deles kun, hvis brugeren selv eksporterer eller kopierer indholdet.",
+    decisionSupportNote: "Scoren er beslutningsstøtte og bør kvalificeres med dialog, datagrundlag og virksomhedens egne prioriteringer.",
+  },
+};
+
 function loadSavedWorkshopState() {
   if (typeof window === "undefined") return null;
   try {
@@ -208,12 +242,7 @@ function getDimensionCounts(factors) {
   const value = factors.filter((factor) => factor.dim === "Værdi").length;
   const feasibility = factors.filter((factor) => factor.dim === "Gennemførlighed").length;
   const difference = Math.abs(value - feasibility);
-  return {
-    value,
-    feasibility,
-    difference,
-    isBalanced: difference <= 1,
-  };
+  return { value, feasibility, difference, isBalanced: difference <= 1 };
 }
 
 function priorityScore(candidates, count, priorityMap) {
@@ -225,28 +254,16 @@ function buildBalancedFactorList(sortedFactors, factorLimit) {
   const feasibilityCandidates = sortedFactors.filter((factor) => factor.dim === "Gennemførlighed");
   const priorityMap = new Map(sortedFactors.map((factor, index) => [factor.id, sortedFactors.length - index]));
   const maxTotal = Math.min(factorLimit, sortedFactors.length);
-
   let best = null;
 
   for (let total = maxTotal; total >= 0; total -= 1) {
     for (let valueCount = 0; valueCount <= total; valueCount += 1) {
       const feasibilityCount = total - valueCount;
-      const isValid =
-        Math.abs(valueCount - feasibilityCount) <= 1 &&
-        valueCount <= valueCandidates.length &&
-        feasibilityCount <= feasibilityCandidates.length;
-
+      const isValid = Math.abs(valueCount - feasibilityCount) <= 1 && valueCount <= valueCandidates.length && feasibilityCount <= feasibilityCandidates.length;
       if (!isValid) continue;
-
-      const score =
-        priorityScore(valueCandidates, valueCount, priorityMap) +
-        priorityScore(feasibilityCandidates, feasibilityCount, priorityMap);
-
-      if (!best || score > best.score) {
-        best = { valueCount, feasibilityCount, score, total };
-      }
+      const score = priorityScore(valueCandidates, valueCount, priorityMap) + priorityScore(feasibilityCandidates, feasibilityCount, priorityMap);
+      if (!best || score > best.score) best = { valueCount, feasibilityCount, score, total };
     }
-
     if (best) break;
   }
 
@@ -254,29 +271,21 @@ function buildBalancedFactorList(sortedFactors, factorLimit) {
 
   const selectedValueIds = new Set(valueCandidates.slice(0, best.valueCount).map((factor) => factor.id));
   const selectedFeasibilityIds = new Set(feasibilityCandidates.slice(0, best.feasibilityCount).map((factor) => factor.id));
-
-  return sortedFactors.filter((factor) =>
-    factor.dim === "Værdi" ? selectedValueIds.has(factor.id) : selectedFeasibilityIds.has(factor.id)
-  );
+  return sortedFactors.filter((factor) => (factor.dim === "Værdi" ? selectedValueIds.has(factor.id) : selectedFeasibilityIds.has(factor.id)));
 }
 
 function buildFactors(companyPackage, initiativeType, factorLimit) {
   const boostedModules = industryBoosts[companyPackage] || [];
   const direct = moduleFactors[initiativeType] || [];
-  const industry = boostedModules
-    .flatMap((id) => moduleFactors[id] || [])
-    .map((factor) => ({ ...factor, weight: factor.weight * 0.9 }));
+  const industry = boostedModules.flatMap((id) => moduleFactors[id] || []).map((factor) => ({ ...factor, weight: factor.weight * 0.9 }));
   const directIds = new Set(direct.map((factor) => factor.id));
-
-  const sortedFactors = uniqueById([...coreFactors, ...direct, ...industry])
-    .sort((a, b) => {
-      const directA = directIds.has(a.id) ? 1 : 0;
-      const directB = directIds.has(b.id) ? 1 : 0;
-      if (directA !== directB) return directB - directA;
-      if (a.dim !== b.dim) return a.dim === "Værdi" ? -1 : 1;
-      return b.weight - a.weight;
-    });
-
+  const sortedFactors = uniqueById([...coreFactors, ...direct, ...industry]).sort((a, b) => {
+    const directA = directIds.has(a.id) ? 1 : 0;
+    const directB = directIds.has(b.id) ? 1 : 0;
+    if (directA !== directB) return directB - directA;
+    if (a.dim !== b.dim) return a.dim === "Værdi" ? -1 : 1;
+    return b.weight - a.weight;
+  });
   return buildBalancedFactorList(sortedFactors, factorLimit);
 }
 
@@ -300,40 +309,23 @@ function rangeText(from, to, unit) {
 }
 
 function makeAbsoluteCenterText(factor, config) {
-  if (config.kind !== "number") {
-    return config.centerText || getDefaultCenterConfig(factor).centerText;
-  }
-
+  if (config.kind !== "number") return config.centerText || getDefaultCenterConfig(factor).centerText;
   const centerValue = Math.max(0, Number(config.centerValue) || 0);
   const unit = config.unit || "enheder";
   const valueText = `${formatNumber(centerValue)} ${unit}`;
-
-  if (config.direction === "lowerBetter") {
-    return `Score 6 svarer til et håndterbart midterniveau på ca. ${valueText}. Lavere niveauer scorer højere, fordi byrden er mindre.`;
-  }
-
+  if (config.direction === "lowerBetter") return `Score 6 svarer til et håndterbart midterniveau på ca. ${valueText}. Lavere niveauer scorer højere, fordi byrden er mindre.`;
   return `Score 6 svarer til en relevant og målbar effekt på ca. ${valueText}. Højere niveauer scorer højere, fordi effekten er større.`;
 }
 
 function makeCenterStatement(factor, config, anchorStyle) {
-  if (anchorStyle === "absolute") {
-    return makeAbsoluteCenterText(factor, config);
-  }
-
-  if (anchorStyle === "relative") {
-    return `Score 6 betyder, at ${factor.name.toLowerCase()} ligger på et relevant midterniveau i forhold til baseline, typisk en tydelig, men ikke markant, forbedring.`;
-  }
-
-  if (anchorStyle === "documentation") {
-    return `Score 6 betyder, at ${factor.name.toLowerCase()} kan forklares med et rimeligt datagrundlag, men at dokumentation, sporbarhed eller validering stadig bør forbedres.`;
-  }
-
+  if (anchorStyle === "absolute") return makeAbsoluteCenterText(factor, config);
+  if (anchorStyle === "relative") return `Score 6 betyder, at ${factor.name.toLowerCase()} ligger på et relevant midterniveau i forhold til baseline, typisk en tydelig, men ikke markant, forbedring.`;
+  if (anchorStyle === "documentation") return `Score 6 betyder, at ${factor.name.toLowerCase()} kan forklares med et rimeligt datagrundlag, men at dokumentation, sporbarhed eller validering stadig bør forbedres.`;
   return `Score 6 betyder, at ${factor.name.toLowerCase()} er relevant og vurderbar, men ikke stærk, kritisk eller transformativ.`;
 }
 
 function buildAbsoluteAnchors(factor, config) {
   const centerText = makeCenterStatement(factor, config, "absolute");
-
   if (config.kind !== "number") {
     return {
       0: `Klart under center: ${factor.anchor0}`,
@@ -343,10 +335,8 @@ function buildAbsoluteAnchors(factor, config) {
       12: `Meget stærkt niveau: ${factor.anchor12}`,
     };
   }
-
   const c = Math.max(0, Number(config.centerValue) || 0);
   const unit = config.unit || "enheder";
-
   if (config.direction === "lowerBetter") {
     return {
       0: `Meget tungt niveau: over ${formatNumber(c * 4)} ${unit}.`,
@@ -356,7 +346,6 @@ function buildAbsoluteAnchors(factor, config) {
       12: `Meget let niveau: under ${formatNumber(c * 0.25)} ${unit} eller næsten ingen byrde.`,
     };
   }
-
   return {
     0: `Ingen, negativ eller udokumenteret effekt: under ${formatNumber(c * 0.1)} ${unit}.`,
     3: `Lav effekt: ca. ${rangeText(c * 0.25, c * 0.75, unit)}.`,
@@ -421,21 +410,13 @@ function isScoreValue(value) {
 function normalizeScoreRange(score) {
   const low = isScoreValue(score.low) ? score.low : null;
   const high = isScoreValue(score.high) ? score.high : null;
-
-  if (low === null || high === null) {
-    return { ...score, low: null, high: null, touched: false };
-  }
-
+  if (low === null || high === null) return { ...score, low: null, high: null, touched: false };
   return { ...score, low: Math.min(low, high), high: Math.max(low, high), touched: score.touched !== false };
 }
 
 function applyBoundScore(current, field, nextValue) {
   const score = normalizeScoreRange(current || { low: null, high: null, confidence: 2, assumption: "", touched: false });
-
-  if (!score.touched) {
-    return { ...score, low: nextValue, high: nextValue, touched: true };
-  }
-
+  if (!score.touched) return { ...score, low: nextValue, high: nextValue, touched: true };
   if (field === "low") return normalizeScoreRange({ ...score, low: nextValue, high: Math.max(score.high, nextValue), touched: true });
   if (field === "high") return normalizeScoreRange({ ...score, low: Math.min(score.low, nextValue), high: nextValue, touched: true });
   return score;
@@ -443,26 +424,13 @@ function applyBoundScore(current, field, nextValue) {
 
 function applyAnchorClick(current, nextValue) {
   const score = normalizeScoreRange(current || { low: null, high: null, confidence: 2, assumption: "", touched: false });
-
-  if (!score.touched) {
-    return { ...score, low: nextValue, high: nextValue, touched: true };
-  }
-
+  if (!score.touched) return { ...score, low: nextValue, high: nextValue, touched: true };
   if (score.low === score.high) {
-    if (score.low === nextValue) {
-      return { ...score, low: null, high: null, touched: false };
-    }
+    if (score.low === nextValue) return { ...score, low: null, high: null, touched: false };
     return { ...score, low: Math.min(score.low, nextValue), high: Math.max(score.high, nextValue), touched: true };
   }
-
-  if (nextValue < score.low) {
-    return { ...score, low: nextValue, high: score.high, touched: true };
-  }
-
-  if (nextValue > score.high) {
-    return { ...score, low: score.low, high: nextValue, touched: true };
-  }
-
+  if (nextValue < score.low) return { ...score, low: nextValue, high: score.high, touched: true };
+  if (nextValue > score.high) return { ...score, low: score.low, high: nextValue, touched: true };
   return { ...score, low: nextValue, high: nextValue, touched: true };
 }
 
@@ -477,10 +445,8 @@ function weightedAverage(factors, scores, dim, field = "best") {
     .filter((factor) => factor.dim === dim)
     .map((factor) => ({ factor, score: normalizeScoreRange(scores[factor.id] || { low: null, high: null, touched: false }) }))
     .filter(({ score }) => score.touched);
-
   const weightSum = selected.reduce((sum, item) => sum + item.factor.weight, 0);
   if (selected.length === 0 || weightSum === 0) return null;
-
   return selected.reduce((sum, item) => {
     const value = field === "best" ? bestScore(item.score) : item.score[field];
     return sum + (Number.isFinite(value) ? value : 0) * item.factor.weight;
@@ -505,6 +471,171 @@ function displayScore(value, digits = 1) {
 
 function displayRawScore(value) {
   return Number.isFinite(value) ? value : "-";
+}
+
+function normalizeInitiativeLink(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function makeSafeFileName(value) {
+  return String(value || "buvi-vurdering")
+    .toLowerCase()
+    .replace(/[æ]/g, "ae")
+    .replace(/[ø]/g, "oe")
+    .replace(/[å]/g, "aa")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "buvi-vurdering";
+}
+
+function selectedAnchorMarker(score, level) {
+  const normalized = normalizeScoreRange(score || { low: null, high: null, touched: false });
+  if (!normalized.touched) return "";
+  const isLow = normalized.low === level;
+  const isHigh = normalized.high === level;
+  if (isLow && isHigh) return "VALGT";
+  if (isLow) return "VALGT LAV";
+  if (isHigh) return "VALGT HØJ";
+  return "";
+}
+
+function getSelectedAnchors(score, anchors) {
+  const normalized = normalizeScoreRange(score || { low: null, high: null, touched: false });
+  if (!normalized.touched) return { low: null, high: null };
+  return {
+    low: { score: normalized.low, text: anchors[normalized.low] || "" },
+    high: { score: normalized.high, text: anchors[normalized.high] || "" },
+  };
+}
+
+function isCriticalUnscoredFactor(factor) {
+  const criticalIds = new Set(["greenwashing", "data", "co2"]);
+  return criticalIds.has(factor.id) || factor.tags.includes("compliance");
+}
+
+function scoreIntervalText(score) {
+  const normalized = normalizeScoreRange(score || { low: null, high: null, touched: false });
+  if (!normalized.touched) return "Ikke scoret";
+  if (normalized.low === normalized.high) return `${normalized.low}`;
+  return `${normalized.low}-${normalized.high}`;
+}
+
+function factorCommentText(row) {
+  return String(row?.score?.assumption || "").trim();
+}
+
+function buildWorkshopSummary({ company, directType, maturityOption, initiativeName, initiativeLink, valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh, confidence, status, roiProxy, factorCounts, overallNotes }) {
+  const lines = [
+    "BUVI/OxF workshopvurdering",
+    `Virksomhed: ${company.name}`,
+    `Initiativ: ${initiativeName || "Ikke navngivet"}`,
+    `Initiativtype: ${directType.name}`,
+    `Beslutningsniveau: ${maturityOption.name}`,
+  ];
+
+  if (initiativeLink) lines.push(`Initiativbeskrivelse: ${normalizeInitiativeLink(initiativeLink)}`);
+
+  lines.push(
+    `Værdi: ${displayScore(valueBest)} (${displayScore(valueLow)}-${displayScore(valueHigh)})`,
+    `Gennemførlighed: ${displayScore(feasibilityBest)} (${displayScore(feasibilityLow)}-${displayScore(feasibilityHigh)})`,
+    `Datagrundlag: ${displayScore(confidence)}/5`,
+    `ROI-proxy: ${Number.isFinite(roiProxy) ? roiProxy.toFixed(0) : "-"}`,
+    `Status: ${status.label}`,
+    `Faktorbalance: ${factorCounts.value} Værdi / ${factorCounts.feasibility} Gennemførlighed`
+  );
+
+  if (overallNotes && overallNotes.trim()) {
+    lines.push("", "Noter / næste skridt:", overallNotes.trim());
+  }
+
+  lines.push(
+    "",
+    `${BRANDING.output.preparedByLabel}:`,
+    `${BRANDING.organization.name} / ${BRANDING.facilitator.name}`,
+    BRANDING.facilitator.title,
+    `${BRANDING.output.contactLabel}: ${BRANDING.facilitator.email} / ${BRANDING.facilitator.phone}`,
+    `LinkedIn: ${BRANDING.facilitator.linkedin}`,
+    `Web: ${BRANDING.organization.website}`,
+    "",
+    BRANDING.output.decisionSupportNote,
+    BRANDING.output.confidentialityNote
+  );
+
+  return lines.join("\n");
+}
+
+function buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, anchorStyle, factorCounts, factors, scores, centerConfigs, result, overallNotes }) {
+  return {
+    schemaVersion: "buvi-scoretool-export-v0.2",
+    appVersion: "v0.2.7-branding",
+    branding: BRANDING,
+    exportedAt: new Date().toISOString(),
+    assessment: {
+      companyId: company.id,
+      companyName: company.name,
+      companyPackage: company.package,
+      initiativeTypeId: directType.id,
+      initiativeTypeName: directType.name,
+      maturityId: maturityOption.id,
+      maturityName: maturityOption.name,
+      initiativeName,
+      initiativeLink: normalizeInitiativeLink(initiativeLink),
+      anchorStyle,
+      factorBalance: factorCounts,
+    },
+    result,
+    factors: factors.map((factor) => {
+      const centerConfig = { ...getDefaultCenterConfig(factor), ...(centerConfigs[factor.id] || {}) };
+      const anchors = buildAnchors(factor, centerConfig, anchorStyle);
+      const score = normalizeScoreRange(scores[factor.id] || { low: null, high: null, confidence: 2, assumption: "", touched: false });
+      return {
+        id: factor.id,
+        name: factor.name,
+        dimension: factor.dim,
+        weight: factor.weight,
+        tags: factor.tags,
+        score,
+        centerConfig: centerConfigs[factor.id] || null,
+        anchors,
+        selectedAnchors: getSelectedAnchors(score, anchors),
+        isCriticalUnscored: !score.touched && isCriticalUnscoredFactor(factor),
+      };
+    }),
+    overallNotes,
+  };
+}
+
+function downloadJsonFile(payload, filenamePrefix) {
+  if (typeof window === "undefined" || typeof document === "undefined") return false;
+  try {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const date = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `${makeSafeFileName(filenamePrefix)}-${date}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    return true;
+  } catch (error) {
+    console.warn("Kunne ikke eksportere JSON", error);
+    return false;
+  }
+}
+
+async function copyTextToClipboard(text) {
+  if (typeof navigator === "undefined" || !navigator.clipboard) return false;
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (error) {
+    console.warn("Kunne ikke kopiere opsummering", error);
+    return false;
+  }
 }
 
 function runPrototypeTests() {
@@ -547,6 +678,23 @@ function runPrototypeTests() {
   console.assert(buildFactors("erhvervsfremme_netvaerk", "esg_data", 12).some((factor) => factor.id === "kildedokumentation"), "Business Viborg configuration includes ESG data factors");
   console.assert(weightedAverage([], {}, "Værdi", "best") === null, "empty factor list returns null average before scoring");
   console.assert(loadSavedWorkshopState() === null || typeof loadSavedWorkshopState() === "object", "local storage loader returns null or state object");
+  console.assert(normalizeInitiativeLink("") === "", "empty initiative link is allowed");
+  console.assert(normalizeInitiativeLink("example.com/buvi.pptx") === "https://example.com/buvi.pptx", "initiative link gets https when protocol is missing");
+  console.assert(normalizeInitiativeLink("https://example.com/buvi.pptx") === "https://example.com/buvi.pptx", "initiative link preserves https links");
+  console.assert(BRANDING.facilitator.email === "christian@probalance.dk", "branding includes facilitator email");
+  console.assert(BRANDING.facilitator.linkedin.startsWith("https://"), "branding LinkedIn URL is normalized");
+  console.assert(!BRANDING.organization.logo.src.startsWith("/"), "branding logo uses a relative public path so GitHub Pages base paths work");
+  console.assert(makeSafeFileName("Æ Ø Å test!") === "ae-oe-aa-test", "safe file names normalize Danish characters");
+  console.assert(buildWorkshopSummary({ company: companies[0], directType: initiativeTypes[0], maturityOption: maturityOptions[0], initiativeName: "Test", initiativeLink: "example.com", valueBest: 6, feasibilityBest: 9, valueLow: 3, valueHigh: 9, feasibilityLow: 9, feasibilityHigh: 9, confidence: 3, status: { label: "Teststatus" }, roiProxy: 54, factorCounts: { value: 4, feasibility: 4 }, overallNotes: "Næste skridt" }).includes("https://example.com"), "workshop summary includes normalized initiative link");
+  console.assert(buildWorkshopSummary({ company: companies[0], directType: initiativeTypes[0], maturityOption: maturityOptions[0], initiativeName: "Test", initiativeLink: "", valueBest: null, feasibilityBest: null, valueLow: null, valueHigh: null, feasibilityLow: null, feasibilityHigh: null, confidence: 2, status: { label: "Ikke scoret" }, roiProxy: null, factorCounts: { value: 4, feasibility: 4 }, overallNotes: "" }).split("\n").length >= 9, "workshop summary is newline separated and handles empty scores");
+  console.assert(selectedAnchorMarker({ low: 3, high: 9, touched: true }, 3) === "VALGT LAV", "selected anchor marker identifies low score");
+  console.assert(selectedAnchorMarker({ low: 3, high: 9, touched: true }, 9) === "VALGT HØJ", "selected anchor marker identifies high score");
+  console.assert(selectedAnchorMarker({ low: 6, high: 6, touched: true }, 6) === "VALGT", "selected anchor marker identifies single score");
+  console.assert(isCriticalUnscoredFactor({ id: "greenwashing", tags: ["kommunikation"] }), "greenwashing is a critical unscored factor");
+  console.assert(scoreIntervalText({ low: null, high: null, touched: false }) === "Ikke scoret", "score interval text handles unscored factors");
+  console.assert(factorCommentText({ score: { assumption: "  Kommentar til faktor  " } }) === "Kommentar til faktor", "factor comments are trimmed for print output");
+  console.assert(matrixGeometry({ valueBest: 6, feasibilityBest: 6, valueLow: 3, valueHigh: 9, feasibilityLow: 3, feasibilityHigh: 9 }).hasMatrixScore, "matrix geometry detects score point");
+  console.assert(!matrixGeometry({ valueBest: null, feasibilityBest: 6, valueLow: null, valueHigh: null, feasibilityLow: 3, feasibilityHigh: 9 }).hasMatrixScore, "matrix geometry handles missing score point");
   const absolute = buildAbsoluteAnchors({ id: "co2", anchor0: "x", anchor12: "y" }, { kind: "number", centerValue: 10, unit: "tons", direction: "higherBetter", centerText: "Score 6 er 10 tons." }, "absolute");
   console.assert(absolute[6].includes("10 tons"), "absolute anchors use score 6 center text");
   const relativeCenter = buildRelativeAnchors({ id: "co2", name: "CO2- og miljøeffekt", anchor0: "x", anchor12: "y" }, { kind: "number", centerValue: 10, unit: "tons", direction: "higherBetter" });
@@ -586,44 +734,56 @@ function Icon({ label }) {
   return <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">{label}</span>;
 }
 
+function BrandingLogo({ className = "h-10 w-auto", showFallback = true }) {
+  return (
+    <div className="flex items-center gap-3">
+      <img
+        src={BRANDING.organization.logo.src}
+        alt={BRANDING.organization.logo.alt}
+        className={`${className} object-contain`}
+        onError={(event) => {
+          event.currentTarget.style.display = "none";
+          const fallback = event.currentTarget.nextElementSibling;
+          if (fallback) fallback.style.display = "inline-flex";
+        }}
+      />
+      {showFallback && <span className="hidden rounded-xl border border-slate-200 px-3 py-1 text-sm font-semibold tracking-wide text-slate-900">{BRANDING.organization.logo.fallbackText}</span>}
+    </div>
+  );
+}
+
+function BrandingContactBlock({ compact = false, className = "" }) {
+  return (
+    <div className={`text-sm text-slate-600 ${className}`}>
+      <div className="font-semibold text-slate-900">{BRANDING.organization.name}</div>
+      <div>{BRANDING.facilitator.name}</div>
+      {!compact && <div>{BRANDING.facilitator.title}</div>}
+      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+        <a className="underline decoration-slate-300 underline-offset-2" href={`mailto:${BRANDING.facilitator.email}`}>{BRANDING.facilitator.email}</a>
+        <a className="underline decoration-slate-300 underline-offset-2" href={`tel:${BRANDING.facilitator.phoneRaw}`}>{BRANDING.facilitator.phone}</a>
+        <a className="underline decoration-slate-300 underline-offset-2" href={BRANDING.organization.website} target="_blank" rel="noreferrer">{BRANDING.organization.website}</a>
+        <a className="underline decoration-slate-300 underline-offset-2" href={BRANDING.facilitator.linkedin} target="_blank" rel="noreferrer">LinkedIn</a>
+      </div>
+    </div>
+  );
+}
+
 function SelectField({ label, value, onChange, options, hint }) {
   return (
     <div className="space-y-2">
       <label className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</label>
-      <select
-        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.map((item) => (
-          <option key={item.id} value={item.id}>{item.name}</option>
-        ))}
+      <select className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2" value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select>
       <p className="text-xs text-slate-500">{hint}</p>
     </div>
   );
 }
 
-function ScoreTargetButton({ active, onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-xl px-3 py-2 text-sm font-medium ring-1 transition ${active ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"}`}
-    >
-      {children}
-    </button>
-  );
-}
-
 function ScoreAnchorButton({ level, text, selectedLow, selectedHigh, onClick }) {
   const selected = selectedLow || selectedHigh;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`group flex min-h-32 flex-col rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${selected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white hover:border-slate-400"}`}
-    >
+    <button type="button" onClick={onClick} className={`group flex min-h-32 flex-col rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${selected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white hover:border-slate-400"}`}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className={`text-2xl font-semibold ${selected ? "text-white" : "text-slate-900"}`}>{level}</span>
         <span className="flex gap-1">
@@ -653,21 +813,11 @@ function CenterConfigEditor({ factor, config, anchorStyle, currentCenterStatemen
         <div className="grid gap-2 md:grid-cols-[1fr_1fr]">
           <label className="space-y-1">
             <span className="text-xs text-slate-500">Score 6 tal</span>
-            <input
-              type="number"
-              min="0"
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2"
-              value={config.centerValue}
-              onChange={(event) => onChange({ ...config, centerValue: Number(event.target.value) })}
-            />
+            <input type="number" min="0" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2" value={config.centerValue} onChange={(event) => onChange({ ...config, centerValue: Number(event.target.value) })} />
           </label>
           <label className="space-y-1">
             <span className="text-xs text-slate-500">Enhed</span>
-            <input
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2"
-              value={config.unit}
-              onChange={(event) => onChange({ ...config, unit: event.target.value })}
-            />
+            <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2" value={config.unit} onChange={(event) => onChange({ ...config, unit: event.target.value })} />
           </label>
         </div>
       ) : isNumber ? (
@@ -677,16 +827,193 @@ function CenterConfigEditor({ factor, config, anchorStyle, currentCenterStatemen
       ) : (
         <label className="space-y-1">
           <span className="text-xs text-slate-500">Kvalitativ centerbeskrivelse</span>
-          <textarea
-            className="min-h-20 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none ring-slate-300 focus:ring-2"
-            value={config.centerText || ""}
-            onChange={(event) => onChange({ ...config, centerText: event.target.value })}
-          />
+          <textarea className="min-h-20 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none ring-slate-300 focus:ring-2" value={config.centerText || ""} onChange={(event) => onChange({ ...config, centerText: event.target.value })} />
         </label>
       )}
       <div className="mt-3 rounded-xl bg-white p-3 text-xs leading-relaxed text-slate-700 ring-1 ring-slate-200">
         <span className="font-semibold">Aktuel score 6-sætning ({anchorStyleOptions.find((item) => item.id === anchorStyle)?.name || "valgt logik"}): </span>
         {currentCenterStatement}
+      </div>
+    </div>
+  );
+}
+
+function matrixGeometry({ valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh }) {
+  const hasMatrixScore = Number.isFinite(valueBest) && Number.isFinite(feasibilityBest);
+  const hasMatrixRange = Number.isFinite(valueLow) && Number.isFinite(valueHigh) && Number.isFinite(feasibilityLow) && Number.isFinite(feasibilityHigh);
+  return {
+    hasMatrixScore,
+    hasMatrixRange,
+    pointX: hasMatrixScore ? Math.min(92, Math.max(8, (feasibilityBest / 12) * 84 + 8)) : null,
+    pointY: hasMatrixScore ? Math.min(92, Math.max(8, 100 - ((valueBest / 12) * 84 + 8))) : null,
+    rectX: hasMatrixRange ? Math.min((feasibilityLow / 12) * 84 + 8, (feasibilityHigh / 12) * 84 + 8) : null,
+    rectY: hasMatrixRange ? Math.min(100 - ((valueHigh / 12) * 84 + 8), 100 - ((valueLow / 12) * 84 + 8)) : null,
+    rectW: hasMatrixRange ? Math.abs(((feasibilityHigh - feasibilityLow) / 12) * 84) : null,
+    rectH: hasMatrixRange ? Math.abs(((valueHigh - valueLow) / 12) * 84) : null,
+  };
+}
+
+function MatrixDiagram({ valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh, className = "h-72 w-full", labelSize = 5.2 }) {
+  const geometry = matrixGeometry({ valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh });
+  return (
+    <svg viewBox="0 0 100 100" className={className} role="img" aria-label="Matrix med værdi på y-aksen og gennemførlighed på x-aksen">
+      <rect x="8" y="8" width="84" height="84" rx="3" fill="white" stroke="#cbd5e1" />
+      <line x1="8" y1="50" x2="92" y2="50" stroke="#e2e8f0" />
+      <line x1="50" y1="8" x2="50" y2="92" stroke="#e2e8f0" />
+      <path d="M 14 86 C 24 64, 40 48, 58 35 C 72 25, 82 18, 90 14" fill="none" stroke="#cbd5e1" strokeDasharray="3 3" />
+      {geometry.hasMatrixRange && <rect x={geometry.rectX} y={geometry.rectY} width={Math.max(2, geometry.rectW)} height={Math.max(2, geometry.rectH)} rx="2" fill="#bfdbfe" opacity="0.55" stroke="#60a5fa" />}
+      {geometry.hasMatrixScore && <circle cx={geometry.pointX} cy={geometry.pointY} r="3.4" fill="#0f172a" />}
+      {!geometry.hasMatrixScore && <text x="50" y="51" fontSize={labelSize} textAnchor="middle" fill="#64748b">Ingen score valgt endnu</text>}
+      <text x="50" y="98" fontSize={labelSize} textAnchor="middle" fill="#334155" fontWeight="600">Gennemførlighed</text>
+      <text x="2.8" y="52" fontSize={labelSize} textAnchor="middle" fill="#334155" fontWeight="600" transform="rotate(-90 2.8 52)">Værdi</text>
+      <text x="11" y="15" fontSize={labelSize * 0.75} fill="#64748b" fontWeight="600">Høj værdi</text>
+      <text x="61" y="88" fontSize={labelSize * 0.75} fill="#64748b" fontWeight="600">Let at gennemføre</text>
+    </svg>
+  );
+}
+
+function PrintReport({ company, directType, maturityOption, initiativeName, initiativeLink, anchorStyleLabel, factorCounts, valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh, confidence, status, roiProxy, factorReportRows, criticalUnscoredRows, overallNotes, onClose }) {
+  const scoredRows = factorReportRows.filter((row) => row.score.touched);
+  const unscoredRowsWithComments = factorReportRows.filter((row) => !row.score.touched && factorCommentText(row));
+  return (
+    <div className="print-report-shell fixed inset-0 z-50 overflow-auto bg-white p-6 text-slate-900">
+      <div className="no-print sticky top-0 z-10 mb-6 flex flex-col gap-3 rounded-2xl bg-white/95 p-4 shadow-sm ring-1 ring-slate-200 backdrop-blur md:flex-row md:items-center md:justify-between">
+        <div>
+          <div className="text-sm font-semibold">Print-/PDF-visning</div>
+          <div className="text-xs text-slate-500">Brug browserens printdialog og vælg “Gem som PDF”, hvis rapporten skal gemmes digitalt.</div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => window.print()} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Udskriv / Gem som PDF</button>
+          <button type="button" onClick={onClose} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Luk printvisning</button>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-5xl space-y-6 print:max-w-none">
+        <section className="print-break-inside-avoid rounded-2xl border border-slate-200 p-6">
+          <div className="mb-5 flex flex-col gap-4 border-b border-slate-200 pb-4 md:flex-row md:items-start md:justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start">
+              <BrandingLogo className="h-28 w-auto print:h-24" />
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{BRANDING.tool.name}</div>
+                <h1 className="mt-1 text-2xl font-semibold">{initiativeName || "Ikke navngivet initiativ"}</h1>
+                <p className="mt-2 text-sm text-slate-600">{BRANDING.tool.subtitle}</p>
+              </div>
+            </div>
+            <div className="text-left md:text-right">
+              <Badge tone="blue">{BRANDING.tool.version}</Badge>
+              <BrandingContactBlock compact className="mt-3" />
+            </div>
+          </div>
+          <div className="grid gap-3 text-sm md:grid-cols-2">
+            <div><span className="font-semibold">Virksomhed:</span> {company.name}</div>
+            <div><span className="font-semibold">Initiativtype:</span> {directType.name}</div>
+            <div><span className="font-semibold">Beslutningsniveau:</span> {maturityOption.name}</div>
+            <div><span className="font-semibold">Scorelogik:</span> {anchorStyleLabel}</div>
+            <div className="md:col-span-2"><span className="font-semibold">Initiativbeskrivelse:</span> {initiativeLink ? <span className="break-all">{normalizeInitiativeLink(initiativeLink)}</span> : "Ikke tilføjet"}</div>
+          </div>
+        </section>
+
+        <section className="print-break-inside-avoid rounded-2xl border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold">Samlet vurdering</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Værdi</div><div className="text-2xl font-semibold">{displayScore(valueBest)}</div><div className="text-xs text-slate-500">Interval {displayScore(valueLow)}-{displayScore(valueHigh)}</div></div>
+            <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Gennemførlighed</div><div className="text-2xl font-semibold">{displayScore(feasibilityBest)}</div><div className="text-xs text-slate-500">Interval {displayScore(feasibilityLow)}-{displayScore(feasibilityHigh)}</div></div>
+            <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Datagrundlag</div><div className="text-2xl font-semibold">{displayScore(confidence)}/5</div><div className="text-xs text-slate-500">ROI-proxy {Number.isFinite(roiProxy) ? roiProxy.toFixed(0) : "-"}</div></div>
+          </div>
+          <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
+            <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200"><span className="font-semibold">Status:</span> {status.label}</div>
+            <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200"><span className="font-semibold">Faktorbalance:</span> {factorCounts.value} Værdi / {factorCounts.feasibility} Gennemførlighed</div>
+          </div>
+          <div className="mt-5 grid gap-4 md:grid-cols-[1fr_1.2fr]">
+            <div className="rounded-xl bg-slate-50 p-4 text-sm leading-relaxed ring-1 ring-slate-200">
+              <div className="font-semibold">Matrixfortolkning</div>
+              <p className="mt-2 text-slate-700">Diagrammet viser initiativets bedste bud som punkt og usikkerhedsinterval som felt. Værdi læses lodret, og gennemførlighed læses vandret.</p>
+            </div>
+            <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+              <h3 className="mb-2 text-base font-semibold">Værdi vs. gennemførlighed</h3>
+              <MatrixDiagram valueBest={valueBest} feasibilityBest={feasibilityBest} valueLow={valueLow} valueHigh={valueHigh} feasibilityLow={feasibilityLow} feasibilityHigh={feasibilityHigh} className="h-80 w-full print:h-72" labelSize={6.2} />
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">Scorede faktorer</h2>
+            <p className="text-sm text-slate-600">Alle anchor statements vises, så vurderingen kan gennemgås og justeres uden PC. Valgte score(r) er markeret.</p>
+          </div>
+          {scoredRows.length === 0 ? <div className="rounded-2xl border border-slate-200 p-4 text-sm text-slate-500">Ingen faktorer er scoret endnu.</div> : scoredRows.map((row) => (
+            <article key={row.factor.id} className="print-break-inside-avoid rounded-2xl border border-slate-200 p-5">
+              <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{row.factor.dim}</div>
+                  <h3 className="text-base font-semibold">{row.factor.name}</h3>
+                  <div className="mt-1 text-xs text-slate-500">Tags: {row.factor.tags.join(", ")}</div>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3 text-sm ring-1 ring-slate-200">
+                  <div><span className="font-semibold">Valgt score:</span> {scoreIntervalText(row.score)}</div>
+                  <div><span className="font-semibold">Bedste bud:</span> {displayRawScore(bestScore(row.score))}</div>
+                  <div><span className="font-semibold">Datagrundlag:</span> {row.score.confidence}/5</div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {SCORE_LEVELS.map((level) => {
+                  const marker = selectedAnchorMarker(row.score, level);
+                  return (
+                    <div key={level} className={`rounded-xl border p-3 text-sm ${marker ? "border-2 border-slate-900 bg-white text-slate-950 shadow-sm" : "border-slate-200 bg-slate-50 text-slate-400 opacity-70"}`}>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className={`font-semibold ${marker ? "text-slate-950" : "text-slate-500"}`}>Score {level}</span>
+                        {marker && <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white ring-1 ring-slate-900">{marker}</span>}
+                      </div>
+                      <div className={marker ? "font-medium text-slate-900" : "text-slate-500"}>{row.anchors[level]}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              {factorCommentText(row) && <div className="mt-3 whitespace-pre-wrap rounded-xl bg-amber-50 p-3 text-sm ring-1 ring-amber-200"><span className="font-semibold">Kommentar / databehov:</span> {factorCommentText(row)}</div>}
+            </article>
+          ))}
+        </section>
+
+        <section className="print-break-inside-avoid rounded-2xl border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold">Ikke-scorede faktorer med kommentarer</h2>
+          {unscoredRowsWithComments.length === 0 ? <p className="mt-2 text-sm text-slate-600">Ingen kommentarer til ikke-scorede faktorer.</p> : (
+            <div className="mt-3 space-y-3">
+              {unscoredRowsWithComments.map((row) => (
+                <article key={row.factor.id} className="rounded-xl bg-amber-50 p-3 text-sm ring-1 ring-amber-200">
+                  <div className="font-semibold">{row.factor.name} <span className="font-normal text-slate-600">({row.factor.dim}, ikke scoret)</span></div>
+                  <div className="mt-2 whitespace-pre-wrap text-slate-700">{factorCommentText(row)}</div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="print-break-inside-avoid rounded-2xl border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold">Kritiske ikke-scorede faktorer</h2>
+          {criticalUnscoredRows.length === 0 ? <p className="mt-2 text-sm text-slate-600">Ingen kritiske/gate-relevante faktorer er udeladt fra scoringen.</p> : (
+            <ul className="mt-3 space-y-2 text-sm">
+              {criticalUnscoredRows.map((row) => <li key={row.factor.id} className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200"><span className="font-semibold">{row.factor.name}</span> ({row.factor.dim}) er ikke scoret, men bør vurderes før ekstern kommunikation eller endelig prioritering.</li>)}
+            </ul>
+          )}
+        </section>
+
+        <section className="print-break-inside-avoid rounded-2xl border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold">Noter og næste skridt</h2>
+          <div className="mt-3 min-h-24 whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm ring-1 ring-slate-200">{overallNotes && overallNotes.trim() ? overallNotes : "Ingen noter tilføjet endnu."}</div>
+        </section>
+
+        <footer className="print-break-inside-avoid rounded-2xl border border-slate-200 p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <BrandingLogo className="h-20 w-auto print:h-16" />
+              <BrandingContactBlock />
+            </div>
+            <div className="max-w-xl text-xs leading-relaxed text-slate-500 md:text-right">
+              <p>{BRANDING.output.decisionSupportNote}</p>
+              <p className="mt-2">{BRANDING.output.confidentialityNote}</p>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
   );
@@ -698,23 +1025,21 @@ export default function BuviScoringPrototype() {
   const [initiativeType, setInitiativeType] = useState(savedState?.initiativeType || "produkt_cirkularitet");
   const [maturity, setMaturity] = useState(savedState?.maturity || "workshop");
   const [initiativeName, setInitiativeName] = useState(savedState?.initiativeName || "Take-back og reparation af arbejdstøj for udvalgte kunder");
+  const [initiativeLink, setInitiativeLink] = useState(savedState?.initiativeLink || "");
   const [anchorStyle, setAnchorStyle] = useState(savedState?.anchorStyle || "absolute");
   const [centerConfigs, setCenterConfigs] = useState(savedState?.centerConfigs || {});
   const [savedAt, setSavedAt] = useState(savedState?.savedAt || null);
   const [storageStatus, setStorageStatus] = useState(savedState ? "Indlæst fra denne browser" : "Ikke gemt endnu");
+  const [exportStatus, setExportStatus] = useState("");
+  const [showPrintReport, setShowPrintReport] = useState(false);
   const [resetCounter, setResetCounter] = useState(0);
 
   const company = companies.find((item) => item.id === companyId) || companies[0];
   const maturityOption = maturityOptions.find((item) => item.id === maturity) || maturityOptions[1];
   const directType = initiativeTypes.find((item) => item.id === initiativeType) || initiativeTypes[0];
   const activeAnchorStyle = anchorStyleOptions.find((item) => item.id === anchorStyle) || anchorStyleOptions[0];
-
-  const factors = useMemo(
-    () => buildFactors(company.package, initiativeType, maturityOption.factorLimit),
-    [company.package, initiativeType, maturityOption.factorLimit, resetCounter]
-  );
+  const factors = useMemo(() => buildFactors(company.package, initiativeType, maturityOption.factorLimit), [company.package, initiativeType, maturityOption.factorLimit, resetCounter]);
   const factorCounts = getDimensionCounts(factors);
-
   const initialScores = useMemo(() => defaultScores(factors), [factors]);
   const [scores, setScores] = useState(savedState?.scores || initialScores);
   const [overallNotes, setOverallNotes] = useState(savedState?.overallNotes || "");
@@ -726,21 +1051,11 @@ export default function BuviScoringPrototype() {
       setStorageStatus("Scoring nulstillet lokalt i denne session");
       return;
     }
-
     setScores((prev) => ({ ...defaultScores(factors), ...prev }));
   }, [factors, resetCounter]);
 
   React.useEffect(() => {
-    const state = {
-      companyId,
-      initiativeType,
-      maturity,
-      initiativeName,
-      anchorStyle,
-      centerConfigs,
-      scores,
-      overallNotes,
-    };
+    const state = { companyId, initiativeType, maturity, initiativeName, initiativeLink, anchorStyle, centerConfigs, scores, overallNotes };
     const ok = saveWorkshopState(state);
     const timestamp = new Date().toISOString();
     if (ok) {
@@ -749,22 +1064,14 @@ export default function BuviScoringPrototype() {
     } else {
       setStorageStatus("Kunne ikke gemme lokalt i browseren");
     }
-  }, [companyId, initiativeType, maturity, initiativeName, anchorStyle, centerConfigs, scores, overallNotes]);
+  }, [companyId, initiativeType, maturity, initiativeName, initiativeLink, anchorStyle, centerConfigs, scores, overallNotes]);
 
   const getCenterConfig = (factor) => ({ ...getDefaultCenterConfig(factor), ...(centerConfigs[factor.id] || {}) });
-
-  const updateCenterConfig = (factorId, nextConfig) => {
-    setCenterConfigs((prev) => ({ ...prev, [factorId]: nextConfig }));
-  };
-
+  const updateCenterConfig = (factorId, nextConfig) => setCenterConfigs((prev) => ({ ...prev, [factorId]: nextConfig }));
   const setScore = (factorId, field, nextValue) => {
     setScores((prev) => {
       const current = prev[factorId] || { low: null, high: null, confidence: 2, assumption: "", touched: false };
-      const updated = field === "confidence"
-        ? { ...current, confidence: nextValue }
-        : field === "anchor"
-          ? applyAnchorClick(current, nextValue)
-          : applyBoundScore(current, field, nextValue);
+      const updated = field === "confidence" ? { ...current, confidence: nextValue } : field === "anchor" ? applyAnchorClick(current, nextValue) : applyBoundScore(current, field, nextValue);
       return { ...prev, [factorId]: updated };
     });
   };
@@ -778,6 +1085,17 @@ export default function BuviScoringPrototype() {
   const confidence = factors.length ? factors.reduce((sum, factor) => sum + ((scores[factor.id] && scores[factor.id].confidence) || 1), 0) / factors.length : 0;
   const status = scoreStatus(valueBest, feasibilityBest, confidence);
   const roiProxy = Number.isFinite(valueBest) && Number.isFinite(feasibilityBest) ? valueBest * feasibilityBest : null;
+  const normalizedInitiativeLink = normalizeInitiativeLink(initiativeLink);
+  const exportResult = { valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh, confidence, roiProxy, status: status.label };
+  const workshopSummary = buildWorkshopSummary({ company, directType, maturityOption, initiativeName, initiativeLink, valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh, confidence, status, roiProxy, factorCounts, overallNotes });
+  const exportPayload = buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, anchorStyle, factorCounts, factors, scores, centerConfigs, result: exportResult, overallNotes });
+  const factorReportRows = factors.map((factor) => {
+    const centerConfig = getCenterConfig(factor);
+    const anchors = buildAnchors(factor, centerConfig, anchorStyle);
+    const score = normalizeScoreRange(scores[factor.id] || { low: null, high: null, confidence: 2, assumption: "", touched: false });
+    return { factor, centerConfig, anchors, score };
+  });
+  const criticalUnscoredRows = factorReportRows.filter((row) => !row.score.touched && isCriticalUnscoredFactor(row.factor));
 
   const hasMatrixScore = Number.isFinite(valueBest) && Number.isFinite(feasibilityBest);
   const hasMatrixRange = Number.isFinite(valueLow) && Number.isFinite(valueHigh) && Number.isFinite(feasibilityLow) && Number.isFinite(feasibilityHigh);
@@ -787,64 +1105,65 @@ export default function BuviScoringPrototype() {
   const rectY = hasMatrixRange ? Math.min(100 - ((valueHigh / 12) * 84 + 8), 100 - ((valueLow / 12) * 84 + 8)) : null;
   const rectW = hasMatrixRange ? Math.abs(((feasibilityHigh - feasibilityLow) / 12) * 84) : null;
   const rectH = hasMatrixRange ? Math.abs(((valueHigh - valueLow) / 12) * 84) : null;
-
-  const statusClass = {
-    green: "bg-emerald-50 ring-emerald-200",
-    amber: "bg-amber-50 ring-amber-200",
-    red: "bg-rose-50 ring-rose-200",
-    gray: "bg-slate-50 ring-slate-200",
-    blue: "bg-sky-50 ring-sky-200",
-  }[status.tone] || "bg-sky-50 ring-sky-200";
+  const statusClass = { green: "bg-emerald-50 ring-emerald-200", amber: "bg-amber-50 ring-amber-200", red: "bg-rose-50 ring-rose-200", gray: "bg-slate-50 ring-slate-200", blue: "bg-sky-50 ring-sky-200" }[status.tone] || "bg-sky-50 ring-sky-200";
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 text-slate-900">
+    <>
+      <style>{`@media print { .no-print { display: none !important; } .print-report-shell { position: static !important; inset: auto !important; overflow: visible !important; padding: 0 !important; } .print-break-inside-avoid { break-inside: avoid; page-break-inside: avoid; } @page { margin: 14mm; } }`}</style>
+      {showPrintReport && (
+        <PrintReport
+          company={company}
+          directType={directType}
+          maturityOption={maturityOption}
+          initiativeName={initiativeName}
+          initiativeLink={initiativeLink}
+          anchorStyleLabel={activeAnchorStyle.name}
+          factorCounts={factorCounts}
+          valueBest={valueBest}
+          feasibilityBest={feasibilityBest}
+          valueLow={valueLow}
+          valueHigh={valueHigh}
+          feasibilityLow={feasibilityLow}
+          feasibilityHigh={feasibilityHigh}
+          confidence={confidence}
+          status={status}
+          roiProxy={roiProxy}
+          factorReportRows={factorReportRows}
+          criticalUnscoredRows={criticalUnscoredRows}
+          overallNotes={overallNotes}
+          onClose={() => setShowPrintReport(false)}
+        />
+      )}
+    <div className={`min-h-screen bg-slate-50 p-6 text-slate-900 ${showPrintReport ? "no-print" : ""}`}>
       <div className="mx-auto max-w-7xl space-y-6">
         <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <Badge>BUVI prototype</Badge>
-              <Badge>OxF scoringsværktøj v0.2.1-balance</Badge>
-              <Badge tone="green">Anchor-baseret scoring</Badge>
+          <div className="flex flex-col gap-4 md:flex-row md:items-start">
+            <BrandingLogo className="h-32 w-auto" />
+            <div>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <Badge>BUVI prototype</Badge>
+                <Badge>{BRANDING.tool.name} {BRANDING.tool.version}</Badge>
+                <Badge tone="green">Anchor-baseret scoring</Badge>
+              </div>
+              <h1 className="text-3xl font-semibold tracking-tight">Konfigurerbart scoringsværktøj</h1>
+              <p className="mt-2 max-w-3xl text-sm text-slate-600">{BRANDING.tool.subtitle}. Vælg virksomhed, initiativtype og scorebeskrivelser. Brugeren klikker på den anchor statement, der passer bedst, og tallet følger automatisk med.</p>
+              <BrandingContactBlock compact className="mt-3" />
             </div>
-            <h1 className="text-3xl font-semibold tracking-tight">Konfigurerbart scoringsværktøj</h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Vælg virksomhed, initiativtype og scorebeskrivelser. Brugeren klikker på den anchor statement, der passer bedst, og tallet følger automatisk med.
-            </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              onClick={() => setResetCounter((value) => value + 1)}
-              className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
-            >
-              Nulstil scoring
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                clearSavedWorkshopState();
-                setScores(defaultScores(factors));
-                setOverallNotes("");
-                setCenterConfigs({});
-                setSavedAt(null);
-                setStorageStatus("Lokal browserdata er slettet");
-              }}
-              className="rounded-2xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-            >
-              Slet lokal data
-            </button>
+            <button type="button" onClick={() => setResetCounter((value) => value + 1)} className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Nulstil scoring</button>
+            <button type="button" onClick={() => { clearSavedWorkshopState(); setScores(defaultScores(factors)); setOverallNotes(""); setCenterConfigs({}); setInitiativeLink(""); setSavedAt(null); setStorageStatus("Lokal browserdata er slettet"); }} className="rounded-2xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Slet lokal data</button>
           </div>
         </header>
 
         <Card>
           <CardContent className="p-4">
             <div className="flex flex-col gap-2 text-sm text-slate-700 md:flex-row md:items-center md:justify-between">
-              <div>
-                <span className="font-semibold">Lokal lagring:</span> {storageStatus}. Dine scoringer gemmes kun i denne browser på denne computer og sendes ikke til GitHub, Business Viborg eller underviser.
-              </div>
-              <div className="text-xs text-slate-500">
-                {savedAt ? `Senest gemt: ${new Date(savedAt).toLocaleString("da-DK")}` : "Ingen gemt tidsstempel endnu"}
-              </div>
+              <div><span className="font-semibold">Lokal lagring:</span> {storageStatus}. Dine scoringer gemmes kun i denne browser på denne computer og sendes ikke til GitHub, Business Viborg eller underviser.</div>
+              <div className="text-xs text-slate-500">{savedAt ? `Senest gemt: ${new Date(savedAt).toLocaleString("da-DK")}` : "Ingen gemt tidsstempel endnu"}</div>
+            </div>
+            <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-600 ring-1 ring-slate-200">
+              <span className="font-semibold text-slate-800">{BRANDING.organization.shortName}:</span> {BRANDING.output.decisionSupportNote}
             </div>
           </CardContent>
         </Card>
@@ -852,22 +1171,27 @@ export default function BuviScoringPrototype() {
         <div className="grid gap-4 lg:grid-cols-4">
           <Card className="lg:col-span-3">
             <CardContent className="p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <Icon label="1" />
-                <h2 className="text-lg font-semibold">1. Konfiguration</h2>
-              </div>
+              <div className="mb-4 flex items-center gap-2"><Icon label="1" /><h2 className="text-lg font-semibold">1. Konfiguration</h2></div>
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <SelectField label="Virksomhed" value={companyId} onChange={setCompanyId} options={companies} hint={company.label} />
                 <SelectField label="Initiativtype" value={initiativeType} onChange={setInitiativeType} options={initiativeTypes} hint={directType.hint} />
                 <SelectField label="Beslutningsniveau" value={maturity} onChange={setMaturity} options={maturityOptions} hint={maturityOption.hint} />
                 <div className="space-y-2">
                   <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Initiativ</label>
-                  <input
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2"
-                    value={initiativeName}
-                    onChange={(event) => setInitiativeName(event.target.value)}
-                  />
+                  <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2" value={initiativeName} onChange={(event) => setInitiativeName(event.target.value)} />
                   <p className="text-xs text-slate-500">Bruges som casebeskrivelse i workshoppen.</p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-4 lg:grid-cols-[2fr_1fr]">
+                <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Aktivt initiativ</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">{initiativeName || "Ikke navngivet endnu"}</div>
+                  <p className="mt-1 text-xs text-slate-500">Denne titel følger med i resultatet og skal senere bruges, når flere initiativer sammenlignes.</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Link til initiativbeskrivelse</label>
+                  <input type="url" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2" placeholder="https://..." value={initiativeLink} onChange={(event) => setInitiativeLink(event.target.value)} />
+                  <div className="text-xs text-slate-500">{normalizedInitiativeLink ? <a className="font-medium text-sky-700 underline decoration-sky-300 underline-offset-2" href={normalizedInitiativeLink} target="_blank" rel="noreferrer">Åbn initiativbeskrivelse</a> : "Indsæt fx link til PowerPoint, PDF, SharePoint eller OneDrive."}</div>
                 </div>
               </div>
             </CardContent>
@@ -875,29 +1199,12 @@ export default function BuviScoringPrototype() {
 
           <Card>
             <CardContent className="p-5">
-              <div className="mb-3 flex items-center gap-2">
-                <Icon label="M" />
-                <h2 className="text-lg font-semibold">Motoren vælger</h2>
-              </div>
+              <div className="mb-3 flex items-center gap-2"><Icon label="M" /><h2 className="text-lg font-semibold">Motoren vælger</h2></div>
               <div className="space-y-3 text-sm">
-                <div className="rounded-xl bg-slate-100 p-3">
-                  <div className="text-xs text-slate-500">Branchepakke</div>
-                  <div className="font-medium">{company.package}</div>
-                </div>
-                <div className="rounded-xl bg-slate-100 p-3">
-                  <div className="text-xs text-slate-500">Faktorer i skema</div>
-                  <div className="font-medium">{factors.length} faktorer</div>
-                  <div className="mt-1 text-xs text-slate-500">{factorCounts.value} Værdi / {factorCounts.feasibility} Gennemførlighed</div>
-                </div>
-                <div className={`rounded-xl p-3 ring-1 ${factorCounts.isBalanced ? "bg-emerald-50 ring-emerald-200" : "bg-rose-50 ring-rose-200"}`}>
-                  <div className="text-xs text-slate-500">Balancekrav</div>
-                  <div className="font-medium">{factorCounts.isBalanced ? "Opfyldt" : "Kræver justering"}</div>
-                  <div className="mt-1 text-xs text-slate-500">Maks. forskel: 1 faktor</div>
-                </div>
-                <div className="rounded-xl bg-slate-100 p-3">
-                  <div className="text-xs text-slate-500">Moduler</div>
-                  <div className="font-medium">Kerne + branche + initiativtype</div>
-                </div>
+                <div className="rounded-xl bg-slate-100 p-3"><div className="text-xs text-slate-500">Branchepakke</div><div className="font-medium">{company.package}</div></div>
+                <div className="rounded-xl bg-slate-100 p-3"><div className="text-xs text-slate-500">Faktorer i skema</div><div className="font-medium">{factors.length} faktorer</div><div className="mt-1 text-xs text-slate-500">{factorCounts.value} Værdi / {factorCounts.feasibility} Gennemførlighed</div></div>
+                <div className={`rounded-xl p-3 ring-1 ${factorCounts.isBalanced ? "bg-emerald-50 ring-emerald-200" : "bg-rose-50 ring-rose-200"}`}><div className="text-xs text-slate-500">Balancekrav</div><div className="font-medium">{factorCounts.isBalanced ? "Opfyldt" : "Kræver justering"}</div><div className="mt-1 text-xs text-slate-500">Maks. forskel: 1 faktor</div></div>
+                <div className="rounded-xl bg-slate-100 p-3"><div className="text-xs text-slate-500">Moduler</div><div className="font-medium">Kerne + branche + initiativtype</div></div>
               </div>
             </CardContent>
           </Card>
@@ -907,34 +1214,20 @@ export default function BuviScoringPrototype() {
           <CardContent className="p-5">
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <div className="mb-2 flex items-center gap-2">
-                  <Icon label="2" />
-                  <h2 className="text-lg font-semibold">2. Beskrivelseslogik for score-niveauer</h2>
-                </div>
-                <p className="max-w-3xl text-sm text-slate-600">
-                  Her vælger du, hvordan score 0, 3, 6, 9 og 12 skal beskrives. Ved absolutte scoregrænser angiver du kun score 6-niveauet for hver faktor. Prototypen danner automatisk de øvrige anchor statements ud fra center-niveauet.
-                </p>
+                <div className="mb-2 flex items-center gap-2"><Icon label="2" /><h2 className="text-lg font-semibold">2. Beskrivelseslogik for score-niveauer</h2></div>
+                <p className="max-w-3xl text-sm text-slate-600">Her vælger du, hvordan score 0, 3, 6, 9 og 12 skal beskrives. Ved absolutte scoregrænser angiver du kun score 6-niveauet for hver faktor. Prototypen danner automatisk de øvrige anchor statements ud fra center-niveauet.</p>
               </div>
-              <div className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-700 lg:max-w-md">
-                <span className="font-semibold">Sådan scorer du:</span> Ingen score er valgt fra start. Klik på én scorebeskrivelse for ét samlet skøn. Klik på den valgte igen for at vælge den fra. Klik på en anden score for at danne et lavt-højt interval. Klik uden for intervallet for at udvide lav/høj grænsen; klik inde i intervallet for at samle vurderingen på én score.
-              </div>
+              <div className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-700 lg:max-w-md"><span className="font-semibold">Sådan scorer du:</span> Ingen score er valgt fra start. Klik på én scorebeskrivelse for ét samlet skøn. Klik på den valgte igen for at vælge den fra. Klik på en anden score for at danne et lavt-højt interval. Klik uden for intervallet for at udvide lav/høj grænsen; klik inde i intervallet for at samle vurderingen på én score.</div>
             </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {anchorStyleOptions.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => setAnchorStyle(option.id)}
-                  className={`rounded-2xl p-4 text-left ring-1 transition hover:-translate-y-0.5 hover:shadow-sm ${anchorStyle === option.id ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-800 ring-slate-200"}`}
-                >
+                <button key={option.id} type="button" onClick={() => setAnchorStyle(option.id)} className={`rounded-2xl p-4 text-left ring-1 transition hover:-translate-y-0.5 hover:shadow-sm ${anchorStyle === option.id ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-800 ring-slate-200"}`}>
                   <div className="font-semibold">{option.name}</div>
                   <div className={`mt-2 text-xs leading-relaxed ${anchorStyle === option.id ? "text-slate-100" : "text-slate-500"}`}>{option.hint}</div>
                 </button>
               ))}
             </div>
-            <div className="mt-4 rounded-2xl bg-slate-100 p-4 text-sm text-slate-700">
-              <span className="font-semibold">Aktiv logik:</span> {activeAnchorStyle.name}. <span className="text-slate-500">Scoren kan også stå tom. En tom faktor tæller ikke med i resultatberegningen.</span>
-            </div>
+            <div className="mt-4 rounded-2xl bg-slate-100 p-4 text-sm text-slate-700"><span className="font-semibold">Aktiv logik:</span> {activeAnchorStyle.name}. <span className="text-slate-500">Scoren kan også stå tom. En tom faktor tæller ikke med i resultatberegningen.</span></div>
           </CardContent>
         </Card>
 
@@ -942,11 +1235,13 @@ export default function BuviScoringPrototype() {
           <Card className="xl:col-span-2">
             <CardContent className="p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Icon label="3" />
-                  <h2 className="text-lg font-semibold">3. Genereret scoringsskema</h2>
+                <div className="flex items-center gap-2"><Icon label="3" /><h2 className="text-lg font-semibold">3. Genereret scoringsskema</h2></div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => { const ok = downloadJsonFile(exportPayload, initiativeName || "buvi-vurdering"); setExportStatus(ok ? "JSON-eksport er hentet" : "JSON-eksport fejlede"); }} className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white shadow-sm hover:bg-slate-800">Eksportér JSON</button>
+                  <button type="button" onClick={async () => { const ok = await copyTextToClipboard(workshopSummary); setExportStatus(ok ? "Opsummering kopieret" : "Kunne ikke kopiere automatisk"); }} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér opsummering</button>
+                  <button type="button" onClick={() => setShowPrintReport(true)} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Åbn printvisning</button>
+                  <Badge>0 - 3 - 6 - 9 - 12</Badge>
                 </div>
-                <Badge>0 - 3 - 6 - 9 - 12</Badge>
               </div>
 
               <div className="space-y-5">
@@ -959,13 +1254,8 @@ export default function BuviScoringPrototype() {
                     <article key={factor.id} className="rounded-2xl border border-slate-200 bg-white p-4">
                       <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                         <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge tone={factor.dim === "Værdi" ? "dark" : "blue"}>{factor.dim}</Badge>
-                            <h3 className="font-semibold">{factor.name}</h3>
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-                            {factor.tags.slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)}
-                          </div>
+                          <div className="flex flex-wrap items-center gap-2"><Badge tone={factor.dim === "Værdi" ? "dark" : "blue"}>{factor.dim}</Badge><h3 className="font-semibold">{factor.name}</h3></div>
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">{factor.tags.slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
                         </div>
                         <div className="grid min-w-64 grid-cols-3 gap-2 text-center text-xs">
                           <div className="rounded-xl bg-sky-50 p-2 ring-1 ring-sky-200"><div className="text-slate-500">Lav</div><div className="text-lg font-semibold text-sky-900">{displayRawScore(score.low)}</div></div>
@@ -974,49 +1264,19 @@ export default function BuviScoringPrototype() {
                         </div>
                       </div>
 
-                      <CenterConfigEditor
-                        factor={factor}
-                        config={centerConfig}
-                        anchorStyle={anchorStyle}
-                        currentCenterStatement={anchors[6]}
-                        onChange={(nextConfig) => updateCenterConfig(factor.id, nextConfig)}
-                      />
+                      <CenterConfigEditor factor={factor} config={centerConfig} anchorStyle={anchorStyle} currentCenterStatement={anchors[6]} onChange={(nextConfig) => updateCenterConfig(factor.id, nextConfig)} />
 
                       <div className="mt-4 grid gap-3 md:grid-cols-5">
-                        {SCORE_LEVELS.map((level) => (
-                          <ScoreAnchorButton
-                            key={level}
-                            level={level}
-                            text={anchors[level]}
-                            selectedLow={score.touched && score.low === level}
-                            selectedHigh={score.touched && score.high === level}
-                            onClick={() => setScore(factor.id, "anchor", level)}
-                          />
-                        ))}
+                        {SCORE_LEVELS.map((level) => <ScoreAnchorButton key={level} level={level} text={anchors[level]} selectedLow={score.touched && score.low === level} selectedHigh={score.touched && score.high === level} onClick={() => setScore(factor.id, "anchor", level)} />)}
                       </div>
 
                       <div className="mt-4 grid gap-3 md:grid-cols-[1fr_2fr]">
                         <div>
                           <div className="mb-1 flex justify-between text-xs"><span>Datagrundlag</span><span>{score.confidence}/5</span></div>
-                          <input
-                            type="range"
-                            min="1"
-                            max="5"
-                            step="1"
-                            value={score.confidence}
-                            onChange={(event) => setScore(factor.id, "confidence", Number(event.target.value))}
-                            className="w-full accent-slate-900"
-                          />
-                          <div className="mt-2 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-700 ring-1 ring-slate-200">
-                            {DATA_CONFIDENCE_DESCRIPTIONS[score.confidence]}
-                          </div>
+                          <input type="range" min="1" max="5" step="1" value={score.confidence} onChange={(event) => setScore(factor.id, "confidence", Number(event.target.value))} className="w-full accent-slate-900" />
+                          <div className="mt-2 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-700 ring-1 ring-slate-200">{DATA_CONFIDENCE_DESCRIPTIONS[score.confidence]}</div>
                         </div>
-                        <textarea
-                          className="min-h-16 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none ring-slate-300 focus:ring-2"
-                          placeholder="Antagelser eller databehov for denne faktor..."
-                          value={score.assumption || ""}
-                          onChange={(event) => setScores((prev) => ({ ...prev, [factor.id]: { ...score, assumption: event.target.value } }))}
-                        />
+                        <textarea className="min-h-16 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none ring-slate-300 focus:ring-2" placeholder="Antagelser eller databehov for denne faktor..." value={score.assumption || ""} onChange={(event) => setScores((prev) => ({ ...prev, [factor.id]: { ...score, assumption: event.target.value } }))} />
                       </div>
                     </article>
                   );
@@ -1028,48 +1288,36 @@ export default function BuviScoringPrototype() {
           <div className="space-y-4">
             <Card>
               <CardContent className="p-5">
-                <div className="mb-3 flex items-center gap-2">
-                  <Icon label="4" />
-                  <h2 className="text-lg font-semibold">4. Resultat</h2>
-                </div>
+                <div className="mb-3 flex items-center gap-2"><Icon label="4" /><h2 className="text-lg font-semibold">4. Resultat</h2></div>
                 <div className="space-y-3">
+                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div><div className="text-xs uppercase tracking-wide text-slate-500">Deling</div><div className="text-sm font-medium text-slate-800">Eksportér eller kopiér vurderingen</div></div>
+                      {exportStatus && <Badge tone={exportStatus.includes("fejlede") || exportStatus.includes("ikke") ? "amber" : "green"}>{exportStatus}</Badge>}
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <button type="button" onClick={() => { const ok = downloadJsonFile(exportPayload, initiativeName || "buvi-vurdering"); setExportStatus(ok ? "JSON-eksport er hentet" : "JSON-eksport fejlede"); }} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Eksportér JSON</button>
+                      <button type="button" onClick={async () => { const ok = await copyTextToClipboard(workshopSummary); setExportStatus(ok ? "Opsummering kopieret" : "Kunne ikke kopiere automatisk"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér opsummering</button>
+                      <button type="button" onClick={() => setShowPrintReport(true)} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Åbn printvisning</button>
+                    </div>
+                    <textarea className="mt-3 min-h-32 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700 outline-none ring-slate-300 focus:ring-2" value={workshopSummary} readOnly />
+                  </div>
+
                   <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
                     <div className="text-xs uppercase tracking-wide text-slate-500">Initiativ</div>
                     <div className="mt-1 font-medium">{initiativeName}</div>
+                    <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 ring-1 ring-slate-200">
+                      <div className="font-semibold text-slate-700">Initiativbeskrivelse</div>
+                      {normalizedInitiativeLink ? <a className="mt-1 inline-flex font-medium text-sky-700 underline decoration-sky-300 underline-offset-2" href={normalizedInitiativeLink} target="_blank" rel="noreferrer">Åbn initiativbeskrivelse</a> : <div className="mt-1">Ingen initiativbeskrivelse tilføjet.</div>}
+                    </div>
                   </div>
+
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
-                      <div className="text-xs text-slate-500">Værdi</div>
-                      <div className="text-3xl font-semibold">{displayScore(valueBest)}</div>
-                      <div className="text-xs text-slate-500">Interval {displayScore(valueLow)}-{displayScore(valueHigh)}</div>
-                    </div>
-                    <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
-                      <div className="text-xs text-slate-500">Gennemførlighed</div>
-                      <div className="text-3xl font-semibold">{displayScore(feasibilityBest)}</div>
-                      <div className="text-xs text-slate-500">Interval {displayScore(feasibilityLow)}-{displayScore(feasibilityHigh)}</div>
-                    </div>
+                    <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Værdi</div><div className="text-3xl font-semibold">{displayScore(valueBest)}</div><div className="text-xs text-slate-500">Interval {displayScore(valueLow)}-{displayScore(valueHigh)}</div></div>
+                    <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Gennemførlighed</div><div className="text-3xl font-semibold">{displayScore(feasibilityBest)}</div><div className="text-xs text-slate-500">Interval {displayScore(feasibilityLow)}-{displayScore(feasibilityHigh)}</div></div>
                   </div>
-                  <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-xs text-slate-500">ROI-proxy</div>
-                        <div className="text-2xl font-semibold">{Number.isFinite(roiProxy) ? roiProxy.toFixed(0) : "-"}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-slate-500">Datagrundlag</div>
-                        <div className="text-2xl font-semibold">{confidence.toFixed(1)}/5</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className={`rounded-2xl p-4 ring-1 ${statusClass}`}>
-                    <div className="flex items-start gap-2">
-                      <Icon label={status.tone === "green" ? "OK" : "i"} />
-                      <div>
-                        <div className="font-semibold">{status.label}</div>
-                        <div className="text-sm text-slate-600">Scoren er et beslutningsstøtteværktøj, ikke en automatisk beslutning.</div>
-                      </div>
-                    </div>
-                  </div>
+                  <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="flex items-center justify-between"><div><div className="text-xs text-slate-500">ROI-proxy</div><div className="text-2xl font-semibold">{Number.isFinite(roiProxy) ? roiProxy.toFixed(0) : "-"}</div></div><div><div className="text-xs text-slate-500">Datagrundlag</div><div className="text-2xl font-semibold">{confidence.toFixed(1)}/5</div></div></div></div>
+                  <div className={`rounded-2xl p-4 ring-1 ${statusClass}`}><div className="flex items-start gap-2"><Icon label={status.tone === "green" ? "OK" : "i"} /><div><div className="font-semibold">{status.label}</div><div className="text-sm text-slate-600">Scoren er et beslutningsstøtteværktøj, ikke en automatisk beslutning.</div></div></div></div>
                 </div>
               </CardContent>
             </Card>
@@ -1078,46 +1326,39 @@ export default function BuviScoringPrototype() {
               <CardContent className="p-5">
                 <h2 className="mb-3 text-lg font-semibold">Værdi vs. gennemførlighed</h2>
                 <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
-                  <svg viewBox="0 0 100 100" className="h-72 w-full" role="img" aria-label="Matrix med værdi på y-aksen og gennemførlighed på x-aksen">
-                    <rect x="8" y="8" width="84" height="84" rx="3" fill="white" stroke="#cbd5e1" />
-                    <line x1="8" y1="50" x2="92" y2="50" stroke="#e2e8f0" />
-                    <line x1="50" y1="8" x2="50" y2="92" stroke="#e2e8f0" />
-                    <path d="M 14 86 C 24 64, 40 48, 58 35 C 72 25, 82 18, 90 14" fill="none" stroke="#cbd5e1" strokeDasharray="3 3" />
-                    {hasMatrixRange && <rect x={rectX} y={rectY} width={Math.max(2, rectW)} height={Math.max(2, rectH)} rx="2" fill="#bfdbfe" opacity="0.55" stroke="#60a5fa" />}
-                    {hasMatrixScore && <circle cx={pointX} cy={pointY} r="3.3" fill="#0f172a" />}
-                    {!hasMatrixScore && <text x="50" y="51" fontSize="4" textAnchor="middle" fill="#94a3b8">Ingen score valgt endnu</text>}
-                    <text x="50" y="98" fontSize="4" textAnchor="middle" fill="#475569">Gennemførlighed</text>
-                    <text x="2" y="52" fontSize="4" textAnchor="middle" fill="#475569" transform="rotate(-90 2 52)">Værdi</text>
-                    <text x="11" y="14" fontSize="3" fill="#94a3b8">Høj værdi</text>
-                    <text x="65" y="89" fontSize="3" fill="#94a3b8">Let at gennemføre</text>
-                  </svg>
+                  <MatrixDiagram valueBest={valueBest} feasibilityBest={feasibilityBest} valueLow={valueLow} valueHigh={valueHigh} feasibilityLow={feasibilityLow} feasibilityHigh={feasibilityHigh} className="h-72 w-full" labelSize={5.6} />
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardContent className="p-5">
-                <div className="mb-3 flex items-center gap-2">
-                  <Icon label="!" />
-                  <h2 className="text-lg font-semibold">Gates og næste skridt</h2>
-                </div>
+                <div className="mb-3 flex items-center gap-2"><Icon label="!" /><h2 className="text-lg font-semibold">Gates og næste skridt</h2></div>
                 <div className="space-y-2 text-sm">
                   {confidence < 3 && <div className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">Datagrundlaget er lavt: brug resultatet til dialog og databehov, ikke ekstern kommunikation.</div>}
                   {factors.some((factor) => factor.id === "greenwashing" && ((scores[factor.id] && bestScore(scores[factor.id])) || 12) < 6) && <div className="rounded-xl bg-rose-50 p-3 ring-1 ring-rose-200">Greenwashing-gate: grønne udsagn bør ikke publiceres før dokumentation og formulering er forbedret.</div>}
                   {Number.isFinite(valueBest) && Number.isFinite(feasibilityBest) && valueBest >= 8 && feasibilityBest < 6 && <div className="rounded-xl bg-sky-50 p-3 ring-1 ring-sky-200">Høj værdi, lav gennemførlighed: lav en afklaringsplan for investering, drift og kompetencer.</div>}
                   {Number.isFinite(valueBest) && Number.isFinite(feasibilityBest) && valueBest >= 7 && feasibilityBest >= 7 && confidence >= 3 && <div className="rounded-xl bg-emerald-50 p-3 ring-1 ring-emerald-200">God kandidat: gå videre med business case eller pilot.</div>}
-                  <textarea
-                    className="mt-3 min-h-24 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none ring-slate-300 focus:ring-2"
-                    placeholder="Notér samlet beslutning, manglende data eller næste beslutningspunkt..."
-                    value={overallNotes}
-                    onChange={(event) => setOverallNotes(event.target.value)}
-                  />
+                  <textarea className="mt-3 min-h-24 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none ring-slate-300 focus:ring-2" placeholder="Notér samlet beslutning, manglende data eller næste beslutningspunkt..." value={overallNotes} onChange={(event) => setOverallNotes(event.target.value)} />
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
+        <footer className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <BrandingLogo className="h-20 w-auto" />
+              <BrandingContactBlock />
+            </div>
+            <div className="max-w-2xl text-xs leading-relaxed text-slate-500 md:text-right">
+              <p>{BRANDING.output.confidentialityNote}</p>
+              <p className="mt-2">{BRANDING.tool.context}</p>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
+    </>
   );
 }
