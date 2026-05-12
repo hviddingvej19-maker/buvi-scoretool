@@ -35,7 +35,7 @@ const BRANDING = {
   tool: {
     name: "BUVI/OxF scoringsværktøj",
     subtitle: "Konfigurerbart workshopværktøj til vurdering af bæredygtighedsinitiativer",
-    version: "v0.3.9-start-links",
+    version: "v0.3.11-remove-navigation-artifacts",
     context: "Udviklet til workshopbrug i BUVI bæredygtighedsnetværket",
   },
   output: {
@@ -765,7 +765,7 @@ function buildWorkshopSummary({ company, directType, maturityOption, initiativeN
 function buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyle, factorCounts, factors, scores, anchorConfigBank, result, overallNotes }) {
   return {
     schemaVersion: "buvi-scoretool-export-v0.2",
-    appVersion: "v0.3.9-start-links",
+    appVersion: "v0.3.11-remove-navigation-artifacts",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     anchorConfigBank,
@@ -811,7 +811,7 @@ function buildExportPayload({ company, directType, maturityOption, initiativeNam
 function buildPortfolioExportPayload({ assessments, assessmentResults, anchorConfigBank }) {
   return {
     schemaVersion: "buvi-scoretool-portfolio-export-v0.1",
-    appVersion: "v0.3.9-start-links",
+    appVersion: "v0.3.11-remove-navigation-artifacts",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     exportedAt: new Date().toISOString(),
@@ -968,7 +968,7 @@ function runPrototypeTests() {
   console.assert(SECTION_THEMES.configuration.card.includes("sky"), "configuration section has its own color theme");
   console.assert(SECTION_THEMES.factorDescriptions.card.includes("amber"), "factor description section has its own color theme");
   console.assert(SECTION_THEMES.scoring.card.includes("emerald"), "initiative scoring section has its own color theme");
-  console.assert(BRANDING.tool.version.includes("onboarding-clarity"), "version label reflects onboarding clarity work");
+  console.assert(BRANDING.tool.version.includes("remove-navigation-artifacts"), "version label reflects section navigation work");
   console.assert(maturityOptions[0].name.includes("Hurtig screening"), "maturity label uses workshop-oriented language");
   const testAssessment = createAssessment({ initiativeName: "Testinitiativ" });
   console.assert(testAssessment.id && testAssessment.initiativeName === "Testinitiativ", "assessment factory creates a named assessment");
@@ -1021,8 +1021,8 @@ function runPrototypeTests() {
 
 runPrototypeTests();
 
-function Card({ children, className = "" }) {
-  return <section className={`rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 ${className}`}>{children}</section>;
+function Card({ children, className = "", ...props }) {
+  return <section {...props} className={`rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 scroll-mt-6 ${className}`}>{children}</section>;
 }
 
 function CardContent({ children, className = "" }) {
@@ -1072,25 +1072,35 @@ function StartHereGuide() {
     { label: "6", title: "Gates", text: "Notér samlet beslutning og næste skridt", target: "section-gates" },
   ];
   return (
-    <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/40">
+    <Card id="section-start" className="border-l-4 border-l-emerald-500 bg-emerald-50/40 scroll-mt-6">
       <CardContent className="p-5">
         <div className="mb-4 flex items-center gap-2"><SectionIcon label="▶" theme={SECTION_THEMES.scoring} /><h2 className="text-lg font-semibold">Start her</h2></div>
         <p className="max-w-4xl text-sm text-slate-700">Brug værktøjet som beslutningsstøtte i workshoppen. Scoren er kun halvdelen af outputtet; kommentarer, antagelser og databehov er lige så vigtige.</p>
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-7">
           {steps.map((step) => (
-            <button
+            <a
               key={step.target}
-              type="button"
-              onClick={() => scrollToSection(step.target)}
-              className="rounded-xl bg-white p-3 text-left text-xs leading-relaxed ring-1 ring-emerald-200 transition hover:-translate-y-0.5 hover:bg-emerald-50 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              href={`#${step.target}`}
+              onClick={(event) => { event.preventDefault(); scrollToSection(step.target); }}
+              className="block rounded-xl bg-white p-3 text-left text-xs leading-relaxed ring-1 ring-emerald-200 transition hover:-translate-y-0.5 hover:bg-emerald-50 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
             >
               <div className="mb-1 flex items-center gap-2 font-semibold text-emerald-900"><span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[10px] ring-1 ring-emerald-200">{step.label}</span>{step.title}</div>
               <div className="text-slate-700">{step.text}</div>
-            </button>
+            </a>
           ))}
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function BackToStartButton({ label = "Tilbage til Start her" }) {
+  return (
+    <div className="mt-5 flex justify-end border-t border-slate-200 pt-4 no-print">
+      <button type="button" onClick={() => scrollToSection("section-start")} className="rounded-xl bg-white px-4 py-2 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 hover:shadow">
+        ↑ {label}
+      </button>
+    </div>
   );
 }
 
@@ -1885,8 +1895,7 @@ export default function BuviScoringPrototype() {
                 <button type="button" onClick={duplicateActiveAssessment} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Duplikér</button>
                 <button type="button" onClick={deleteActiveAssessment} disabled={assessments.length <= 1} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">Slet</button>
               </div>
-            </div>
-          </CardContent>
+            </div><BackToStartButton /></CardContent>
         </Card>
 
         <div className="grid gap-4 lg:grid-cols-4">
@@ -1907,8 +1916,7 @@ export default function BuviScoringPrototype() {
                 <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Link til initiativbeskrivelse</label>
                 <input type="url" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2" placeholder="https://..." value={initiativeLink} onChange={(event) => setInitiativeLink(event.target.value)} />
                 <div className="text-xs text-slate-500">{normalizedInitiativeLink ? <a className="font-medium text-sky-700 underline decoration-sky-300 underline-offset-2" href={normalizedInitiativeLink} target="_blank" rel="noreferrer">Åbn initiativbeskrivelse</a> : "Indsæt fx link til PowerPoint, PDF, SharePoint eller OneDrive."}</div>
-              </div>
-            </CardContent>
+              </div><BackToStartButton /></CardContent>
           </Card>
 
           <Card className={SECTION_THEMES.engine.card}>
@@ -1940,8 +1948,7 @@ export default function BuviScoringPrototype() {
                   <div className={`mt-2 text-xs leading-relaxed ${anchorStyle === option.id ? "text-slate-100" : "text-slate-500"}`}>{option.hint}</div>
                 </button>
               ))}
-            </div>
-          </CardContent>
+            </div><BackToStartButton /></CardContent>
         </Card>
 
         <Card id="section-factor-descriptions" className={SECTION_THEMES.factorDescriptions.card}>
@@ -2027,8 +2034,7 @@ export default function BuviScoringPrototype() {
                   </div>
                 </section>
               ))}
-            </div>
-          </CardContent>
+            </div><BackToStartButton /></CardContent>
         </Card>
 
         <div className="grid gap-4 xl:grid-cols-3">
@@ -2121,8 +2127,7 @@ export default function BuviScoringPrototype() {
                     </div>
                   </section>
                 ))}
-              </div>
-            </CardContent>
+              </div><BackToStartButton /></CardContent>
           </Card>
 
           <div className="space-y-4">
@@ -2143,8 +2148,7 @@ export default function BuviScoringPrototype() {
                   <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="flex items-center justify-between"><div><div className="text-xs text-slate-500">Prioriteringsindikator</div><div className="text-2xl font-semibold">{Number.isFinite(roiProxy) ? roiProxy.toFixed(0) : "-"}</div></div><div><div className="text-xs text-slate-500">Datagrundlag / sikkerhed</div><div className="text-2xl font-semibold">{confidence.toFixed(1)}/5</div></div></div></div>
                   <div className={`rounded-2xl p-4 ring-1 ${commentStats.missingCommentCount > 0 ? "bg-amber-50 ring-amber-200" : "bg-emerald-50 ring-emerald-200"}`}><div className="text-xs text-slate-500">Kommentarstatus</div><div className="mt-1 font-semibold">{commentStats.commentedScoreCount}/{commentStats.scoredCount || 0} scorede faktorer har kommentarer</div><div className="mt-1 text-xs text-slate-600">{commentStats.missingCommentCount > 0 ? `${commentStats.missingCommentCount} scorede faktor(er) mangler kort note om drøftelse eller databehov.` : "Alle scorede faktorer har dokumenteret kommentar."}</div></div>
                   <div className={`rounded-2xl p-4 ring-1 ${statusClass}`}><div className="flex items-start gap-2"><Icon label={status.tone === "green" ? "OK" : "i"} /><div><div className="font-semibold">{status.label}</div><div className="text-sm text-slate-600">Scoren er et beslutningsstøtteværktøj, ikke en automatisk beslutning.</div></div></div></div>
-                </div>
-              </CardContent>
+                </div><BackToStartButton /></CardContent>
             </Card>
 
             <Card id="section-export" className={SECTION_THEMES.result.card}>
@@ -2176,8 +2180,7 @@ export default function BuviScoringPrototype() {
                   </div>
 
                   {exportStatus && <div className="rounded-xl bg-blue-50 p-3 text-xs text-blue-800 ring-1 ring-blue-200">{exportStatus}</div>}
-                </div>
-              </CardContent>
+                </div><BackToStartButton /></CardContent>
             </Card>
 
             <Card id="section-matrix" className={SECTION_THEMES.result.card}>
@@ -2210,8 +2213,7 @@ export default function BuviScoringPrototype() {
                       </button>
                     );
                   })}
-                </div>
-              </CardContent>
+                </div><BackToStartButton /></CardContent>
             </Card>
 
             <Card id="section-gates" className={SECTION_THEMES.gates.card}>
@@ -2223,8 +2225,7 @@ export default function BuviScoringPrototype() {
                   {Number.isFinite(valueBest) && Number.isFinite(feasibilityBest) && valueBest >= 8 && feasibilityBest < 6 && <div className="rounded-xl bg-sky-50 p-3 ring-1 ring-sky-200">Høj værdi, lav gennemførlighed: lav en afklaringsplan for investering, drift og kompetencer.</div>}
                   {Number.isFinite(valueBest) && Number.isFinite(feasibilityBest) && valueBest >= 7 && feasibilityBest >= 7 && confidence >= 3 && <div className="rounded-xl bg-emerald-50 p-3 ring-1 ring-emerald-200">God kandidat: gå videre med business case eller pilot.</div>}
                   <textarea className="mt-3 min-h-24 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none ring-slate-300 focus:ring-2" placeholder="Notér samlet beslutning, manglende data eller næste beslutningspunkt..." value={overallNotes} onChange={(event) => setOverallNotes(event.target.value)} />
-                </div>
-              </CardContent>
+                </div><BackToStartButton /></CardContent>
             </Card>
           </div>
         </div>
