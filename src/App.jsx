@@ -35,7 +35,7 @@ const BRANDING = {
   tool: {
     name: "BUVI/OxF scoringsværktøj",
     subtitle: "Konfigurerbart workshopværktøj til vurdering af bæredygtighedsinitiativer",
-    version: "v0.3.0-multiple-assessments-part1",
+    version: "v0.3.1-comparison-matrix",
     context: "Udviklet til workshopbrug i BUVI bæredygtighedsnetværket",
   },
   output: {
@@ -720,7 +720,7 @@ function buildWorkshopSummary({ company, directType, maturityOption, initiativeN
 function buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyle, factorCounts, factors, scores, anchorConfigBank, result, overallNotes }) {
   return {
     schemaVersion: "buvi-scoretool-export-v0.2",
-    appVersion: "v0.3.0-multiple-assessments-part1",
+    appVersion: "v0.3.1-comparison-matrix",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     anchorConfigBank,
@@ -850,6 +850,8 @@ function runPrototypeTests() {
   console.assert(testAssessment.id && testAssessment.initiativeName === "Testinitiativ", "assessment factory creates a named assessment");
   console.assert(cloneAssessment(testAssessment).id !== testAssessment.id, "assessment clone gets a new id");
   console.assert(getInitialWorkshopState({ assessments: [testAssessment], activeAssessmentId: testAssessment.id }).activeAssessmentId === testAssessment.id, "initial workshop state preserves active assessment id");
+  const scoredAssessment = createAssessment({ scores: { co2: { low: 6, high: 6, confidence: 3, touched: true }, opex: { low: 6, high: 6, confidence: 3, touched: true }, strategi: { low: 6, high: 6, confidence: 3, touched: true }, kundevaerdi: { low: 6, high: 6, confidence: 3, touched: true }, kapacitet: { low: 6, high: 6, confidence: 3, touched: true }, investering: { low: 6, high: 6, confidence: 3, touched: true }, teknisk: { low: 6, high: 6, confidence: 3, touched: true }, data: { low: 6, high: 6, confidence: 3, touched: true } } });
+  console.assert(getAssessmentResult(scoredAssessment).hasMatrixScore, "assessment result supports comparison matrix when both dimensions are scored");
   console.assert(SHARE_LINK.shortUrl.includes("probalance.dk/buvi"), "share link has a presentation-friendly short URL");
   console.assert(getQrCodeUrl(SHARE_LINK.canonicalUrl).includes("data="), "QR code URL is generated for the public tool link");
   console.assert(getQrCodeUrl(SHARE_LINK.canonicalUrl).includes("api.qrserver.com"), "QR code URL uses the configured QR generator");
@@ -1073,6 +1075,40 @@ function CenterConfigEditor({ factor, config, anchorStyle, currentCenterStatemen
   );
 }
 
+function getAssessmentResult(assessment) {
+  const company = companies.find((item) => item.id === assessment.companyId) || companies[0];
+  const maturityOption = maturityOptions.find((item) => item.id === assessment.maturity) || maturityOptions[1];
+  const directType = initiativeTypes.find((item) => item.id === assessment.initiativeType) || initiativeTypes[0];
+  const factors = buildFactors(company.package, directType.id, maturityOption.factorLimit);
+  const scores = assessment.scores || {};
+  const valueBest = weightedAverage(factors, scores, "Værdi", "best");
+  const feasibilityBest = weightedAverage(factors, scores, "Gennemførlighed", "best");
+  const valueLow = weightedAverage(factors, scores, "Værdi", "low");
+  const valueHigh = weightedAverage(factors, scores, "Værdi", "high");
+  const feasibilityLow = weightedAverage(factors, scores, "Gennemførlighed", "low");
+  const feasibilityHigh = weightedAverage(factors, scores, "Gennemførlighed", "high");
+  const confidence = factors.length ? factors.reduce((sum, factor) => sum + ((scores[factor.id] && scores[factor.id].confidence) || 1), 0) / factors.length : 0;
+  const status = scoreStatus(valueBest, feasibilityBest, confidence);
+  return {
+    assessment,
+    company,
+    directType,
+    maturityOption,
+    factors,
+    factorCounts: getDimensionCounts(factors),
+    valueBest,
+    feasibilityBest,
+    valueLow,
+    valueHigh,
+    feasibilityLow,
+    feasibilityHigh,
+    confidence,
+    roiProxy: Number.isFinite(valueBest) && Number.isFinite(feasibilityBest) ? valueBest * feasibilityBest : null,
+    status,
+    hasMatrixScore: Number.isFinite(valueBest) && Number.isFinite(feasibilityBest),
+  };
+}
+
 function matrixGeometry({ valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh }) {
   const hasMatrixScore = Number.isFinite(valueBest) && Number.isFinite(feasibilityBest);
   const hasMatrixRange = Number.isFinite(valueLow) && Number.isFinite(valueHigh) && Number.isFinite(feasibilityLow) && Number.isFinite(feasibilityHigh);
@@ -1099,6 +1135,36 @@ function MatrixDiagram({ valueBest, feasibilityBest, valueLow, valueHigh, feasib
       {geometry.hasMatrixRange && <rect x={geometry.rectX} y={geometry.rectY} width={Math.max(2, geometry.rectW)} height={Math.max(2, geometry.rectH)} rx="2" fill="#bfdbfe" opacity="0.55" stroke="#60a5fa" />}
       {geometry.hasMatrixScore && <circle cx={geometry.pointX} cy={geometry.pointY} r="3.4" fill="#0f172a" />}
       {!geometry.hasMatrixScore && <text x="50" y="51" fontSize={labelSize} textAnchor="middle" fill="#64748b">Ingen score valgt endnu</text>}
+      <text x="50" y="98" fontSize={labelSize} textAnchor="middle" fill="#334155" fontWeight="600">Gennemførlighed</text>
+      <text x="2.8" y="52" fontSize={labelSize} textAnchor="middle" fill="#334155" fontWeight="600" transform="rotate(-90 2.8 52)">Værdi</text>
+      <text x="11" y="15" fontSize={labelSize * 0.75} fill="#64748b" fontWeight="600">Høj værdi</text>
+      <text x="61" y="88" fontSize={labelSize * 0.75} fill="#64748b" fontWeight="600">Let at gennemføre</text>
+    </svg>
+  );
+}
+
+function ComparisonMatrixDiagram({ assessmentResults, activeAssessmentId, onSelect, className = "h-80 w-full", labelSize = 5.2 }) {
+  const activeResult = assessmentResults.find((result) => result.assessment.id === activeAssessmentId);
+  const activeGeometry = activeResult ? matrixGeometry(activeResult) : null;
+  const scoredResults = assessmentResults.filter((result) => result.hasMatrixScore);
+  return (
+    <svg viewBox="0 0 100 100" className={className} role="img" aria-label="Sammenligningsmatrix med flere initiativer">
+      <rect x="8" y="8" width="84" height="84" rx="3" fill="white" stroke="#cbd5e1" />
+      <line x1="8" y1="50" x2="92" y2="50" stroke="#e2e8f0" />
+      <line x1="50" y1="8" x2="50" y2="92" stroke="#e2e8f0" />
+      <path d="M 14 86 C 24 64, 40 48, 58 35 C 72 25, 82 18, 90 14" fill="none" stroke="#cbd5e1" strokeDasharray="3 3" />
+      {activeGeometry?.hasMatrixRange && <rect x={activeGeometry.rectX} y={activeGeometry.rectY} width={Math.max(2, activeGeometry.rectW)} height={Math.max(2, activeGeometry.rectH)} rx="2" fill="#bfdbfe" opacity="0.5" stroke="#60a5fa" />}
+      {scoredResults.length === 0 && <text x="50" y="51" fontSize={labelSize} textAnchor="middle" fill="#64748b">Ingen initiativer har både værdi- og gennemførlighedsscore endnu</text>}
+      {scoredResults.map((result, index) => {
+        const geometry = matrixGeometry(result);
+        const isActive = result.assessment.id === activeAssessmentId;
+        return (
+          <g key={result.assessment.id} onClick={() => onSelect?.(result.assessment.id)} className="cursor-pointer">
+            <circle cx={geometry.pointX} cy={geometry.pointY} r={isActive ? "4.2" : "3"} fill={isActive ? "#0f172a" : "#0284c7"} opacity={isActive ? "1" : "0.72"} stroke="white" strokeWidth="1.2" />
+            <text x={geometry.pointX + 4.2} y={geometry.pointY - 2.6} fontSize={labelSize * 0.7} fill={isActive ? "#0f172a" : "#0369a1"} fontWeight={isActive ? "700" : "600"}>{index + 1}</text>
+          </g>
+        );
+      })}
       <text x="50" y="98" fontSize={labelSize} textAnchor="middle" fill="#334155" fontWeight="600">Gennemførlighed</text>
       <text x="2.8" y="52" fontSize={labelSize} textAnchor="middle" fill="#334155" fontWeight="600" transform="rotate(-90 2.8 52)">Værdi</text>
       <text x="11" y="15" fontSize={labelSize * 0.75} fill="#64748b" fontWeight="600">Høj værdi</text>
@@ -1380,6 +1446,8 @@ export default function BuviScoringPrototype() {
   });
   const criticalUnscoredRows = factorReportRows.filter((row) => !row.score.touched && isCriticalUnscoredFactor(row.factor));
   const factorDescriptionGroups = groupFactorsByDimension(factors);
+  const assessmentResults = useMemo(() => assessments.map((assessment) => getAssessmentResult(assessment)), [assessments]);
+  const scoredAssessmentResults = assessmentResults.filter((result) => result.hasMatrixScore);
 
   const hasMatrixScore = Number.isFinite(valueBest) && Number.isFinite(feasibilityBest);
   const hasMatrixRange = Number.isFinite(valueLow) && Number.isFinite(valueHigh) && Number.isFinite(feasibilityLow) && Number.isFinite(feasibilityHigh);
@@ -1709,9 +1777,34 @@ export default function BuviScoringPrototype() {
 
             <Card className={SECTION_THEMES.result.card}>
               <CardContent className="p-5">
-                <h2 className="mb-3 text-lg font-semibold">Værdi vs. gennemførlighed</h2>
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold">Sammenligningsmatrix</h2>
+                    <p className="mt-1 text-xs text-slate-600">Alle initiativer med både værdi- og gennemførlighedsscore vises som punkter. Det aktive initiativ er mørkt og viser usikkerhedsinterval.</p>
+                  </div>
+                  <Badge tone="blue">{scoredAssessmentResults.length}/{assessments.length} scoret</Badge>
+                </div>
                 <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
-                  <MatrixDiagram valueBest={valueBest} feasibilityBest={feasibilityBest} valueLow={valueLow} valueHigh={valueHigh} feasibilityLow={feasibilityLow} feasibilityHigh={feasibilityHigh} className="h-72 w-full" labelSize={5.6} />
+                  <ComparisonMatrixDiagram assessmentResults={assessmentResults} activeAssessmentId={activeAssessmentId} onSelect={setActiveAssessmentId} className="h-80 w-full" labelSize={5.6} />
+                </div>
+                <div className="mt-3 space-y-2">
+                  {assessmentResults.map((result, index) => {
+                    const isActive = result.assessment.id === activeAssessmentId;
+                    return (
+                      <button key={result.assessment.id} type="button" onClick={() => setActiveAssessmentId(result.assessment.id)} className={`w-full rounded-xl p-3 text-left text-xs ring-1 transition hover:bg-slate-50 ${isActive ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-200"}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="font-semibold">{index + 1}. {result.assessment.initiativeName || "Ikke navngivet initiativ"}</div>
+                            <div className={isActive ? "mt-1 text-slate-200" : "mt-1 text-slate-500"}>{result.company.name} · {result.directType.name}</div>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <div>V {displayScore(result.valueBest)}</div>
+                            <div>G {displayScore(result.feasibilityBest)}</div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
