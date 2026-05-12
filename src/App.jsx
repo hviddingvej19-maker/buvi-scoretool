@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 
 const SCORE_LEVELS = [0, 3, 6, 9, 12];
 const STORAGE_KEY = "buvi-scoretool-workshop-v3-multiple-assessments";
-const APP_VERSION = "v0.3.18-hard-reset-comments";
+const APP_VERSION = "v0.3.19-clean-blank-pdf";
 
 const DATA_CONFIDENCE_DESCRIPTIONS = {
   1: "Meget svagt datagrundlag: scoren bygger primært på mavefornemmelse, generelle antagelser eller AI-estimat uden konkret virksomhedsdata.",
@@ -910,7 +910,7 @@ function runPrototypeTests() {
   console.assert(groupFactorsByDimension(factors).feasibility.every((factor) => factor.dim === "Gennemførlighed"), "feasibility factors are grouped");
   console.assert(normalizeInitiativeLink("example.com") === "https://example.com", "initiative links get protocol");
   console.assert(appendCommentTemplate("Eksisterende note", COMMENT_TEMPLATES[0].text).includes("\nAntagelse:"), "comment template appends on a new line");
-  console.assert(BRANDING.tool.version.includes("hard-reset-comments"), "version label reflects hard reset comments cleanup");
+  console.assert(BRANDING.tool.version.includes("clean-blank-pdf"), "version label reflects clean blank PDF behavior");
   console.assert(resetAssessmentContent(createAssessment({ scores: { co2: { ...emptyScore(), assumption: "gammel kommentar" } }, overallNotes: "note" })).scores.co2 === undefined, "reset removes score comments completely");
   const scoredAssessment = createAssessment({ scores: { co2: { low: 6, high: 6, confidence: 3, touched: true }, kapacitet: { low: 6, high: 6, confidence: 3, touched: true } } });
   console.assert(getAssessmentResult(scoredAssessment).hasMatrixScore, "assessment result supports matrix score");
@@ -1281,7 +1281,7 @@ function PrintReport({ company, directType, maturityOption, initiativeName, init
           {scoredRows.length === 0 ? <div className="rounded-2xl border border-slate-200 p-4 text-sm text-slate-500">Ingen faktorer er scoret endnu.</div> : scoredRows.map((row) => <FactorPrintCard key={row.factor.id} row={row} />)}
         </section>
         <section className="print-break-inside-avoid rounded-2xl border border-slate-200 p-6"><h2 className="text-lg font-semibold">Ikke-scorede faktorer med kommentarer</h2>{unscoredRowsWithComments.length === 0 ? <p className="mt-2 text-sm text-slate-600">Ingen kommentarer til ikke-scorede faktorer.</p> : <div className="mt-3 space-y-3">{unscoredRowsWithComments.map((row) => <article key={row.factor.id} className="rounded-xl bg-amber-50 p-3 text-sm ring-1 ring-amber-200"><div className="font-semibold">{row.factor.name} <span className="font-normal text-slate-600">({row.factor.dim}, ikke scoret)</span></div><div className="mt-2 whitespace-pre-wrap text-slate-700">{factorCommentText(row)}</div></article>)}</div>}</section>
-        <section className="print-break-inside-avoid rounded-2xl border border-slate-200 p-6"><h2 className="text-lg font-semibold">Kritiske ikke-scorede faktorer</h2>{criticalUnscoredRows.length === 0 ? <p className="mt-2 text-sm text-slate-600">Ingen kritiske/gate-relevante faktorer er udeladt fra scoringen.</p> : <ul className="mt-3 space-y-2 text-sm">{criticalUnscoredRows.map((row) => <li key={row.factor.id} className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200"><span className="font-semibold">{row.factor.name}</span> ({row.factor.dim}) er ikke scoret, men bør vurderes før ekstern kommunikation eller endelig prioritering.</li>)}</ul>}</section>
+        {criticalUnscoredRows.length > 0 && <section className="print-break-inside-avoid rounded-2xl border border-slate-200 p-6"><h2 className="text-lg font-semibold">Automatiske metodeadvarsler</h2><p className="mt-2 text-sm text-slate-600">Disse punkter vises kun, når vurderingen er påbegyndt, og en kritisk faktor stadig mangler scoring.</p><ul className="mt-3 space-y-2 text-sm">{criticalUnscoredRows.map((row) => <li key={row.factor.id} className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200"><span className="font-semibold">{row.factor.name}</span> ({row.factor.dim}) er ikke scoret, men bør vurderes før ekstern kommunikation eller endelig prioritering.</li>)}</ul></section>}
         <section className="print-break-inside-avoid rounded-2xl border border-slate-200 p-6"><h2 className="text-lg font-semibold">Noter og næste skridt</h2><div className="mt-3 min-h-24 whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm ring-1 ring-slate-200">{overallNotes && overallNotes.trim() ? overallNotes : "Ingen noter tilføjet endnu."}</div></section>
         <ReportFooter />
       </div>
@@ -1465,7 +1465,8 @@ export default function BuviScoringPrototype() {
     const score = normalizeScoreRange(scores[factor.id] || { low: null, high: null, confidence: 2, assumption: "", touched: false });
     return { factor, centerConfig, anchors, score, anchorStyle: factorAnchorStyle, anchorStyleName: anchorStyleOptions.find((item) => item.id === factorAnchorStyle)?.name || factorAnchorStyle };
   });
-  const criticalUnscoredRows = factorReportRows.filter((row) => !row.score.touched && isCriticalUnscoredFactor(row.factor));
+  const hasActiveAssessmentActivity = factorReportRows.some((row) => row.score.touched || factorCommentText(row)) || Boolean(overallNotes.trim());
+  const criticalUnscoredRows = hasActiveAssessmentActivity ? factorReportRows.filter((row) => !row.score.touched && isCriticalUnscoredFactor(row.factor)) : [];
   const commentStats = getCommentStatsForFactors(factors, scores);
   const assessmentResults = useMemo(() => assessments.map((assessment) => getAssessmentResult(assessment)), [assessments]);
   const scoredAssessmentResults = assessmentResults.filter((result) => result.hasMatrixScore);
