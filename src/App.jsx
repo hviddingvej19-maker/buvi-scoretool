@@ -10,7 +10,7 @@ const DATA_CONFIDENCE_DESCRIPTIONS = {
   5: "Stærkt datagrundlag: scoren er dokumenteret, sporbar og kan efterprøves af ledelse, kunde eller ekstern part.",
 };
 
-const STORAGE_KEY = "buvi-scoretool-workshop-v2-anchor-config-bank";
+const STORAGE_KEY = "buvi-scoretool-workshop-v3-multiple-assessments";
 
 const BRANDING = {
   organization: {
@@ -35,7 +35,7 @@ const BRANDING = {
   tool: {
     name: "BUVI/OxF scoringsværktøj",
     subtitle: "Konfigurerbart workshopværktøj til vurdering af bæredygtighedsinitiativer",
-    version: "v0.2.16-ui-cleanup",
+    version: "v0.3.0-multiple-assessments-part1",
     context: "Udviklet til workshopbrug i BUVI bæredygtighedsnetværket",
   },
   output: {
@@ -99,6 +99,52 @@ const SECTION_THEMES = {
     label: "Gates",
   },
 };
+
+function createAssessmentId() {
+  return `assessment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createAssessment(overrides = {}) {
+  const now = new Date().toISOString();
+  return {
+    id: overrides.id || createAssessmentId(),
+    createdAt: overrides.createdAt || now,
+    updatedAt: overrides.updatedAt || now,
+    companyId: overrides.companyId || "nybo",
+    initiativeType: overrides.initiativeType || "produkt_cirkularitet",
+    maturity: overrides.maturity || "workshop",
+    initiativeName: overrides.initiativeName || "Take-back og reparation af arbejdstøj for udvalgte kunder",
+    initiativeLink: overrides.initiativeLink || "",
+    anchorStyle: overrides.anchorStyle || "absolute",
+    scores: overrides.scores || {},
+    overallNotes: overrides.overallNotes || "",
+  };
+}
+
+function cloneAssessment(assessment, nameSuffix = " (kopi)") {
+  const now = new Date().toISOString();
+  return createAssessment({
+    ...assessment,
+    id: createAssessmentId(),
+    createdAt: now,
+    updatedAt: now,
+    initiativeName: `${assessment.initiativeName || "Initiativ"}${nameSuffix}`,
+    scores: JSON.parse(JSON.stringify(assessment.scores || {})),
+  });
+}
+
+function getInitialWorkshopState(savedState) {
+  const savedAssessments = Array.isArray(savedState?.assessments) ? savedState.assessments.filter(Boolean) : [];
+  if (savedAssessments.length > 0) {
+    const normalized = savedAssessments.map((assessment) => createAssessment(assessment));
+    const activeAssessmentId = normalized.some((assessment) => assessment.id === savedState?.activeAssessmentId) ? savedState.activeAssessmentId : normalized[0].id;
+    return { assessments: normalized, activeAssessmentId };
+  }
+
+  const legacyActive = savedState?.activeAssessment;
+  const fallbackAssessment = createAssessment(legacyActive || {});
+  return { assessments: [fallbackAssessment], activeAssessmentId: fallbackAssessment.id };
+}
 
 function loadSavedWorkshopState() {
   if (typeof window === "undefined") return null;
@@ -674,7 +720,7 @@ function buildWorkshopSummary({ company, directType, maturityOption, initiativeN
 function buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyle, factorCounts, factors, scores, anchorConfigBank, result, overallNotes }) {
   return {
     schemaVersion: "buvi-scoretool-export-v0.2",
-    appVersion: "v0.2.16-ui-cleanup",
+    appVersion: "v0.3.0-multiple-assessments-part1",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     anchorConfigBank,
@@ -799,7 +845,11 @@ function runPrototypeTests() {
   console.assert(SECTION_THEMES.configuration.card.includes("sky"), "configuration section has its own color theme");
   console.assert(SECTION_THEMES.factorDescriptions.card.includes("amber"), "factor description section has its own color theme");
   console.assert(SECTION_THEMES.scoring.card.includes("emerald"), "initiative scoring section has its own color theme");
-  console.assert(BRANDING.tool.version.includes("ui-cleanup"), "version label reflects UI cleanup work");
+  console.assert(BRANDING.tool.version.includes("multiple-assessments-part1"), "version label reflects multiple assessment work");
+  const testAssessment = createAssessment({ initiativeName: "Testinitiativ" });
+  console.assert(testAssessment.id && testAssessment.initiativeName === "Testinitiativ", "assessment factory creates a named assessment");
+  console.assert(cloneAssessment(testAssessment).id !== testAssessment.id, "assessment clone gets a new id");
+  console.assert(getInitialWorkshopState({ assessments: [testAssessment], activeAssessmentId: testAssessment.id }).activeAssessmentId === testAssessment.id, "initial workshop state preserves active assessment id");
   console.assert(SHARE_LINK.shortUrl.includes("probalance.dk/buvi"), "share link has a presentation-friendly short URL");
   console.assert(getQrCodeUrl(SHARE_LINK.canonicalUrl).includes("data="), "QR code URL is generated for the public tool link");
   console.assert(getQrCodeUrl(SHARE_LINK.canonicalUrl).includes("api.qrserver.com"), "QR code URL uses the configured QR generator");
@@ -1207,13 +1257,9 @@ function PrintReport({ company, directType, maturityOption, initiativeName, init
 
 export default function BuviScoringPrototype() {
   const savedState = useMemo(() => loadSavedWorkshopState(), []);
-  const savedAssessment = savedState?.activeAssessment || {};
-  const [companyId, setCompanyId] = useState(savedAssessment?.companyId || "nybo");
-  const [initiativeType, setInitiativeType] = useState(savedAssessment?.initiativeType || "produkt_cirkularitet");
-  const [maturity, setMaturity] = useState(savedAssessment?.maturity || "workshop");
-  const [initiativeName, setInitiativeName] = useState(savedAssessment?.initiativeName || "Take-back og reparation af arbejdstøj for udvalgte kunder");
-  const [initiativeLink, setInitiativeLink] = useState(savedAssessment?.initiativeLink || "");
-  const [anchorStyle, setAnchorStyle] = useState(savedAssessment?.anchorStyle || "absolute");
+  const initialWorkshopState = useMemo(() => getInitialWorkshopState(savedState), [savedState]);
+  const [assessments, setAssessments] = useState(initialWorkshopState.assessments);
+  const [activeAssessmentId, setActiveAssessmentId] = useState(initialWorkshopState.activeAssessmentId);
   const [anchorConfigBank, setAnchorConfigBank] = useState(savedState?.anchorConfigBank || createAnchorConfigBank());
   const [savedAt, setSavedAt] = useState(savedState?.savedAt || null);
   const [storageStatus, setStorageStatus] = useState(savedState ? "Indlæst fra denne browser" : "Ikke gemt endnu");
@@ -1222,6 +1268,51 @@ export default function BuviScoringPrototype() {
   const [showPrintReport, setShowPrintReport] = useState(false);
   const [resetCounter, setResetCounter] = useState(0);
 
+  const activeAssessment = assessments.find((assessment) => assessment.id === activeAssessmentId) || assessments[0] || createAssessment();
+  const updateActiveAssessment = (patch) => {
+    setAssessments((prev) => prev.map((assessment) => assessment.id === activeAssessment.id ? { ...assessment, ...patch, updatedAt: new Date().toISOString() } : assessment));
+  };
+  const setCompanyId = (value) => updateActiveAssessment({ companyId: value });
+  const setInitiativeType = (value) => updateActiveAssessment({ initiativeType: value });
+  const setMaturity = (value) => updateActiveAssessment({ maturity: value });
+  const setInitiativeName = (value) => updateActiveAssessment({ initiativeName: value });
+  const setInitiativeLink = (value) => updateActiveAssessment({ initiativeLink: value });
+  const setAnchorStyle = (value) => updateActiveAssessment({ anchorStyle: value });
+  const setOverallNotes = (value) => updateActiveAssessment({ overallNotes: value });
+  const setScores = (updater) => updateActiveAssessment({ scores: typeof updater === "function" ? updater(activeAssessment.scores || {}) : updater });
+  const companyId = activeAssessment.companyId;
+  const initiativeType = activeAssessment.initiativeType;
+  const maturity = activeAssessment.maturity;
+  const initiativeName = activeAssessment.initiativeName;
+  const initiativeLink = activeAssessment.initiativeLink;
+  const anchorStyle = activeAssessment.anchorStyle;
+  const overallNotes = activeAssessment.overallNotes || "";
+
+  const createNewAssessment = () => {
+    const next = createAssessment({
+      companyId,
+      initiativeType,
+      maturity,
+      anchorStyle,
+      initiativeName: `Nyt initiativ ${assessments.length + 1}`,
+      scores: {},
+      overallNotes: "",
+    });
+    setAssessments((prev) => [...prev, next]);
+    setActiveAssessmentId(next.id);
+  };
+  const duplicateActiveAssessment = () => {
+    const clone = cloneAssessment(activeAssessment);
+    setAssessments((prev) => [...prev, clone]);
+    setActiveAssessmentId(clone.id);
+  };
+  const deleteActiveAssessment = () => {
+    if (assessments.length <= 1) return;
+    const remaining = assessments.filter((assessment) => assessment.id !== activeAssessment.id);
+    setAssessments(remaining);
+    setActiveAssessmentId(remaining[0].id);
+  };
+
   const company = companies.find((item) => item.id === companyId) || companies[0];
   const maturityOption = maturityOptions.find((item) => item.id === maturity) || maturityOptions[1];
   const directType = initiativeTypes.find((item) => item.id === initiativeType) || initiativeTypes[0];
@@ -1229,8 +1320,7 @@ export default function BuviScoringPrototype() {
   const factors = useMemo(() => buildFactors(company.package, initiativeType, maturityOption.factorLimit), [company.package, initiativeType, maturityOption.factorLimit, resetCounter]);
   const factorCounts = getDimensionCounts(factors);
   const initialScores = useMemo(() => defaultScores(factors), [factors]);
-  const [scores, setScores] = useState(savedAssessment?.scores || initialScores);
-  const [overallNotes, setOverallNotes] = useState(savedAssessment?.overallNotes || "");
+  const scores = activeAssessment.scores || initialScores;
 
   React.useEffect(() => {
     if (resetCounter > 0) {
@@ -1245,16 +1335,8 @@ export default function BuviScoringPrototype() {
   React.useEffect(() => {
     const state = {
       anchorConfigBank,
-      activeAssessment: {
-        companyId,
-        initiativeType,
-        maturity,
-        initiativeName,
-        initiativeLink,
-        anchorStyle,
-        scores,
-        overallNotes,
-      },
+      activeAssessmentId,
+      assessments,
     };
     const ok = saveWorkshopState(state);
     const timestamp = new Date().toISOString();
@@ -1264,7 +1346,7 @@ export default function BuviScoringPrototype() {
     } else {
       setStorageStatus("Kunne ikke gemme lokalt i browseren");
     }
-  }, [companyId, initiativeType, maturity, initiativeName, initiativeLink, anchorStyle, anchorConfigBank, scores, overallNotes]);
+  }, [anchorConfigBank, activeAssessmentId, assessments]);
 
   const getCenterConfig = (factor) => getAnchorConfigFromBank(anchorConfigBank, factor);
   const updateCenterConfig = (factorId, nextConfig) => setAnchorConfigBank((prev) => updateAnchorConfigBank(prev, factorId, nextConfig));
@@ -1358,7 +1440,7 @@ export default function BuviScoringPrototype() {
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <button type="button" onClick={() => setResetCounter((value) => value + 1)} className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Nulstil scoring</button>
-            <button type="button" onClick={() => { clearSavedWorkshopState(); setScores(defaultScores(factors)); setOverallNotes(""); setAnchorConfigBank(createAnchorConfigBank()); setInitiativeLink(""); setSavedAt(null); setStorageStatus("Lokal browserdata er slettet"); }} className="rounded-2xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Slet lokal data</button>
+            <button type="button" onClick={() => { const next = createAssessment(); clearSavedWorkshopState(); setAssessments([next]); setActiveAssessmentId(next.id); setAnchorConfigBank(createAnchorConfigBank()); setSavedAt(null); setStorageStatus("Lokal browserdata er slettet"); }} className="rounded-2xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Slet lokal data</button>
           </div>
         </header>
 
@@ -1375,6 +1457,31 @@ export default function BuviScoringPrototype() {
         </Card>
 
         <ShareLinkQrBlock onCopy={copyShareLink} status={shareStatus} />
+
+        <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/30">
+          <CardContent className="p-5">
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <SectionHeader label="0" title="Initiativer" theme={SECTION_THEMES.scoring}>
+                <p>Opret, skift, duplikér og slet lokale initiativvurderinger. Fælles faktorbeskrivelser deles på tværs af initiativer; scoringer og kommentarer er pr. initiativ.</p>
+              </SectionHeader>
+              <Badge tone="green">{assessments.length} initiativ{assessments.length === 1 ? "" : "er"}</Badge>
+            </div>
+            <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+              <div className="space-y-2">
+                <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Aktivt initiativ</label>
+                <select className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2" value={activeAssessment.id} onChange={(event) => setActiveAssessmentId(event.target.value)}>
+                  {assessments.map((assessment, index) => <option key={assessment.id} value={assessment.id}>{index + 1}. {assessment.initiativeName || "Ikke navngivet initiativ"}</option>)}
+                </select>
+                <p className="text-xs text-slate-500">Den valgte vurdering redigeres i sektionerne nedenfor.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={createNewAssessment} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Nyt initiativ</button>
+                <button type="button" onClick={duplicateActiveAssessment} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Duplikér</button>
+                <button type="button" onClick={deleteActiveAssessment} disabled={assessments.length <= 1} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">Slet</button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-4 lg:grid-cols-4">
           <Card className={`lg:col-span-3 ${SECTION_THEMES.configuration.card}`}>
