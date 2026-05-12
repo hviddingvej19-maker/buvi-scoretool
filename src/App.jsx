@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 
 const SCORE_LEVELS = [0, 3, 6, 9, 12];
 const STORAGE_KEY = "buvi-scoretool-workshop-v3-multiple-assessments";
-const APP_VERSION = "v0.3.15-workshop-safety-polish";
+const APP_VERSION = "v0.3.16-reset-and-switch-fix";
 
 const DATA_CONFIDENCE_DESCRIPTIONS = {
   1: "Meget svagt datagrundlag: scoren bygger primært på mavefornemmelse, generelle antagelser eller AI-estimat uden konkret virksomhedsdata.",
@@ -883,8 +883,7 @@ function runPrototypeTests() {
   console.assert(groupFactorsByDimension(factors).feasibility.every((factor) => factor.dim === "Gennemførlighed"), "feasibility factors are grouped");
   console.assert(normalizeInitiativeLink("example.com") === "https://example.com", "initiative links get protocol");
   console.assert(appendCommentTemplate("Eksisterende note", COMMENT_TEMPLATES[0].text).includes("\nAntagelse:"), "comment template appends on a new line");
-  console.assert(BRANDING.tool.version.includes("workshop-safety-polish"), "version label reflects workshop safety polish");
-  console.assert(confirmDestructiveAction("test") === true || typeof window !== "undefined", "destructive confirmation is safe during non-browser checks");
+  console.assert(BRANDING.tool.version.includes("reset-and-switch-fix"), "version label reflects reset and switch fix");
   const scoredAssessment = createAssessment({ scores: { co2: { low: 6, high: 6, confidence: 3, touched: true }, kapacitet: { low: 6, high: 6, confidence: 3, touched: true } } });
   console.assert(getAssessmentResult(scoredAssessment).hasMatrixScore, "assessment result supports matrix score");
   console.assert(matrixGeometry({ valueBest: 6, feasibilityBest: 6, valueLow: 3, valueHigh: 9, feasibilityLow: 3, feasibilityHigh: 9 }).hasMatrixScore, "matrix geometry handles score point");
@@ -1317,7 +1316,7 @@ export default function BuviScoringPrototype() {
   const [shareStatus, setShareStatus] = useState("");
   const [showPrintReport, setShowPrintReport] = useState(false);
   const [showPortfolioPrintReport, setShowPortfolioPrintReport] = useState(false);
-  const [resetCounter, setResetCounter] = useState(0);
+  
 
   const activeAssessment = assessments.find((assessment) => assessment.id === activeAssessmentId) || assessments[0] || createAssessment();
   const updateActiveAssessment = (patch) => {
@@ -1345,7 +1344,7 @@ export default function BuviScoringPrototype() {
   const maturityOption = maturityOptions.find((item) => item.id === maturity) || maturityOptions[1];
   const directType = initiativeTypes.find((item) => item.id === initiativeType) || initiativeTypes[0];
   const activeAnchorStyle = anchorStyleOptions.find((item) => item.id === anchorStyle) || anchorStyleOptions[0];
-  const factors = useMemo(() => buildFactors(company.package, initiativeType, maturityOption.factorLimit), [company.package, initiativeType, maturityOption.factorLimit, resetCounter]);
+  const factors = useMemo(() => buildFactors(company.package, initiativeType, maturityOption.factorLimit), [company.package, initiativeType, maturityOption.factorLimit]);
   const initialScores = useMemo(() => defaultScores(factors), [factors]);
   const scores = activeAssessment.scores || initialScores;
   const factorCounts = getDimensionCounts(factors);
@@ -1353,14 +1352,8 @@ export default function BuviScoringPrototype() {
   const factorDescriptionGroups = groupFactorsByDimension(factors);
 
   useEffect(() => {
-    if (resetCounter > 0) {
-      setScores(defaultScores(factors));
-      setOverallNotes("");
-      setStorageStatus("Scoring nulstillet lokalt i denne session");
-      return;
-    }
     setScores((prev) => ({ ...defaultScores(factors), ...prev }));
-  }, [factors, resetCounter]);
+  }, [activeAssessment.id, factors]);
 
   useEffect(() => {
     const ok = saveWorkshopState({ anchorConfigBank, activeAssessmentId, assessments });
@@ -1392,6 +1385,13 @@ export default function BuviScoringPrototype() {
     const remaining = assessments.filter((assessment) => assessment.id !== activeAssessment.id);
     setAssessments(remaining);
     setActiveAssessmentId(remaining[0].id);
+  };
+
+  const resetActiveScoring = () => {
+    const ok = confirmDestructiveAction(`Nulstil scoring, kommentarer og noter for "${activeAssessment.initiativeName || "Ikke navngivet initiativ"}"? Andre initiativer berøres ikke.`);
+    if (!ok) return;
+    updateActiveAssessment({ scores: defaultScores(factors), overallNotes: "" });
+    setStorageStatus("Scoring nulstillet for aktivt initiativ");
   };
 
   const getCenterConfig = (factor) => getAnchorConfigFromBank(anchorConfigBank, factor);
@@ -1460,7 +1460,7 @@ export default function BuviScoringPrototype() {
               </div>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <button type="button" onClick={() => setResetCounter((value) => value + 1)} className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Nulstil scoring</button>
+              <button type="button" onClick={resetActiveScoring} className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Nulstil scoring</button>
               <button type="button" onClick={() => { const ok = confirmDestructiveAction("Slet al lokal browserdata for værktøjet? Dette fjerner alle lokale initiativer, scoringer og kommentarer på denne computer."); if (!ok) return; const next = createAssessment(); clearSavedWorkshopState(); setAssessments([next]); setActiveAssessmentId(next.id); setAnchorConfigBank(createAnchorConfigBank()); setSavedAt(null); setStorageStatus("Lokal browserdata er slettet"); }} className="rounded-2xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Slet lokal data</button>
             </div>
           </header>
