@@ -35,7 +35,7 @@ const BRANDING = {
   tool: {
     name: "BUVI/OxF scoringsværktøj",
     subtitle: "Konfigurerbart workshopværktøj til vurdering af bæredygtighedsinitiativer",
-    version: "v0.3.3-grouped-factor-description-ui",
+    version: "v0.3.4-export-actions",
     context: "Udviklet til workshopbrug i BUVI bæredygtighedsnetværket",
   },
   output: {
@@ -720,7 +720,7 @@ function buildWorkshopSummary({ company, directType, maturityOption, initiativeN
 function buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyle, factorCounts, factors, scores, anchorConfigBank, result, overallNotes }) {
   return {
     schemaVersion: "buvi-scoretool-export-v0.2",
-    appVersion: "v0.3.3-grouped-factor-description-ui",
+    appVersion: "v0.3.4-export-actions",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     anchorConfigBank,
@@ -766,7 +766,7 @@ function buildExportPayload({ company, directType, maturityOption, initiativeNam
 function buildPortfolioExportPayload({ assessments, assessmentResults, anchorConfigBank }) {
   return {
     schemaVersion: "buvi-scoretool-portfolio-export-v0.1",
-    appVersion: "v0.3.3-grouped-factor-description-ui",
+    appVersion: "v0.3.4-export-actions",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     exportedAt: new Date().toISOString(),
@@ -923,7 +923,7 @@ function runPrototypeTests() {
   console.assert(SECTION_THEMES.configuration.card.includes("sky"), "configuration section has its own color theme");
   console.assert(SECTION_THEMES.factorDescriptions.card.includes("amber"), "factor description section has its own color theme");
   console.assert(SECTION_THEMES.scoring.card.includes("emerald"), "initiative scoring section has its own color theme");
-  console.assert(BRANDING.tool.version.includes("portfolio-export"), "version label reflects portfolio export work");
+  console.assert(BRANDING.tool.version.includes("export-actions"), "version label reflects export action cleanup work");
   const testAssessment = createAssessment({ initiativeName: "Testinitiativ" });
   console.assert(testAssessment.id && testAssessment.initiativeName === "Testinitiativ", "assessment factory creates a named assessment");
   console.assert(cloneAssessment(testAssessment).id !== testAssessment.id, "assessment clone gets a new id");
@@ -1630,10 +1630,7 @@ export default function BuviScoringPrototype() {
                 <button type="button" onClick={createNewAssessment} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Nyt initiativ</button>
                 <button type="button" onClick={duplicateActiveAssessment} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Duplikér</button>
                 <button type="button" onClick={deleteActiveAssessment} disabled={assessments.length <= 1} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">Slet</button>
-                <button type="button" onClick={() => { const ok = downloadJsonFile(portfolioExportPayload, "buvi-samlet-initiativliste"); setExportStatus(ok ? "Samlet initiativliste eksporteret" : "Portfolio-eksport fejlede"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Eksportér samlet JSON</button>
-                <button type="button" onClick={async () => { const ok = await copyTextToClipboard(portfolioSummary); setExportStatus(ok ? "Samlet initiativliste kopieret" : "Kunne ikke kopiere samlet liste"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér samlet liste</button>
               </div>
-              {exportStatus && <div className="mt-3 rounded-xl bg-white p-3 text-xs text-slate-600 ring-1 ring-slate-200">{exportStatus}</div>}
             </div>
           </CardContent>
         </Card>
@@ -1879,6 +1876,38 @@ export default function BuviScoringPrototype() {
                   </div>
                   <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="flex items-center justify-between"><div><div className="text-xs text-slate-500">ROI-proxy</div><div className="text-2xl font-semibold">{Number.isFinite(roiProxy) ? roiProxy.toFixed(0) : "-"}</div></div><div><div className="text-xs text-slate-500">Datagrundlag</div><div className="text-2xl font-semibold">{confidence.toFixed(1)}/5</div></div></div></div>
                   <div className={`rounded-2xl p-4 ring-1 ${statusClass}`}><div className="flex items-start gap-2"><Icon label={status.tone === "green" ? "OK" : "i"} /><div><div className="font-semibold">{status.label}</div><div className="text-sm text-slate-600">Scoren er et beslutningsstøtteværktøj, ikke en automatisk beslutning.</div></div></div></div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className={SECTION_THEMES.result.card}>
+              <CardContent className="p-5">
+                <div className="mb-4 flex items-center gap-2"><SectionIcon label="E" theme={SECTION_THEMES.result} /><h2 className="text-lg font-semibold">Deling og eksport</h2></div>
+                <div className="space-y-4">
+                  <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                    <div className="mb-3">
+                      <div className="text-sm font-semibold">Aktiv vurdering</div>
+                      <div className="mt-1 text-xs text-slate-500">Eksportér eller print den vurdering, der er valgt som aktivt initiativ.</div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+                      <button type="button" onClick={() => { const ok = downloadJsonFile(exportPayload, initiativeName || "buvi-vurdering"); setExportStatus(ok ? "Aktiv vurdering eksporteret som JSON" : "JSON-eksport fejlede"); }} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Eksportér JSON</button>
+                      <button type="button" onClick={async () => { const ok = await copyTextToClipboard(workshopSummary); setExportStatus(ok ? "Opsummering kopieret" : "Kunne ikke kopiere opsummering"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér opsummering</button>
+                      <button type="button" onClick={() => { setShowPrintReport(true); setExportStatus("Print-/PDF-visning åbnet"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Åbn print/PDF</button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                    <div className="mb-3">
+                      <div className="text-sm font-semibold">Samlet initiativliste</div>
+                      <div className="mt-1 text-xs text-slate-500">Eksportér eller kopiér hele porteføljen med alle lokale initiativer.</div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                      <button type="button" onClick={() => { const ok = downloadJsonFile(portfolioExportPayload, "buvi-samlet-initiativliste"); setExportStatus(ok ? "Samlet initiativliste eksporteret" : "Portfolio-eksport fejlede"); }} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Eksportér samlet JSON</button>
+                      <button type="button" onClick={async () => { const ok = await copyTextToClipboard(portfolioSummary); setExportStatus(ok ? "Samlet initiativliste kopieret" : "Kunne ikke kopiere samlet liste"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér samlet liste</button>
+                    </div>
+                  </div>
+
+                  {exportStatus && <div className="rounded-xl bg-blue-50 p-3 text-xs text-blue-800 ring-1 ring-blue-200">{exportStatus}</div>}
                 </div>
               </CardContent>
             </Card>
