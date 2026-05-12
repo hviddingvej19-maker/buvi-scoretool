@@ -35,7 +35,7 @@ const BRANDING = {
   tool: {
     name: "BUVI/OxF scoringsværktøj",
     subtitle: "Konfigurerbart workshopværktøj til vurdering af bæredygtighedsinitiativer",
-    version: "v0.3.1-comparison-matrix",
+    version: "v0.3.3-grouped-factor-description-ui",
     context: "Udviklet til workshopbrug i BUVI bæredygtighedsnetværket",
   },
   output: {
@@ -720,7 +720,7 @@ function buildWorkshopSummary({ company, directType, maturityOption, initiativeN
 function buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyle, factorCounts, factors, scores, anchorConfigBank, result, overallNotes }) {
   return {
     schemaVersion: "buvi-scoretool-export-v0.2",
-    appVersion: "v0.3.1-comparison-matrix",
+    appVersion: "v0.3.3-grouped-factor-description-ui",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     anchorConfigBank,
@@ -761,6 +761,84 @@ function buildExportPayload({ company, directType, maturityOption, initiativeNam
     }),
     overallNotes,
   };
+}
+
+function buildPortfolioExportPayload({ assessments, assessmentResults, anchorConfigBank }) {
+  return {
+    schemaVersion: "buvi-scoretool-portfolio-export-v0.1",
+    appVersion: "v0.3.3-grouped-factor-description-ui",
+    branding: BRANDING,
+    shareLink: SHARE_LINK,
+    exportedAt: new Date().toISOString(),
+    anchorConfigBank,
+    portfolio: {
+      assessmentCount: assessments.length,
+      scoredAssessmentCount: assessmentResults.filter((result) => result.hasMatrixScore).length,
+    },
+    assessments: assessmentResults.map((result, index) => ({
+      index: index + 1,
+      id: result.assessment.id,
+      createdAt: result.assessment.createdAt,
+      updatedAt: result.assessment.updatedAt,
+      companyId: result.company.id,
+      companyName: result.company.name,
+      companyPackage: result.company.package,
+      initiativeTypeId: result.directType.id,
+      initiativeTypeName: result.directType.name,
+      maturityId: result.maturityOption.id,
+      maturityName: result.maturityOption.name,
+      initiativeName: result.assessment.initiativeName || "Ikke navngivet initiativ",
+      initiativeLink: normalizeInitiativeLink(result.assessment.initiativeLink),
+      defaultAnchorStyle: result.assessment.anchorStyle,
+      factorBalance: result.factorCounts,
+      result: {
+        valueBest: result.valueBest,
+        feasibilityBest: result.feasibilityBest,
+        valueLow: result.valueLow,
+        valueHigh: result.valueHigh,
+        feasibilityLow: result.feasibilityLow,
+        feasibilityHigh: result.feasibilityHigh,
+        confidence: result.confidence,
+        roiProxy: result.roiProxy,
+        status: result.status.label,
+        hasMatrixScore: result.hasMatrixScore,
+      },
+      scores: result.assessment.scores || {},
+      overallNotes: result.assessment.overallNotes || "",
+    })),
+  };
+}
+
+function buildPortfolioSummary({ assessmentResults }) {
+  const lines = [
+    "BUVI/OxF samlet initiativliste",
+    `Antal initiativer: ${assessmentResults.length}`,
+    `Scorede initiativer i matrix: ${assessmentResults.filter((result) => result.hasMatrixScore).length}`,
+    "",
+    "Initiativer:",
+  ];
+
+  assessmentResults.forEach((result, index) => {
+    lines.push(
+      `${index + 1}. ${result.assessment.initiativeName || "Ikke navngivet initiativ"}`,
+      `   Virksomhed: ${result.company.name}`,
+      `   Initiativtype: ${result.directType.name}`,
+      `   Værdi: ${displayScore(result.valueBest)} (${displayScore(result.valueLow)}-${displayScore(result.valueHigh)})`,
+      `   Gennemførlighed: ${displayScore(result.feasibilityBest)} (${displayScore(result.feasibilityLow)}-${displayScore(result.feasibilityHigh)})`,
+      `   Datagrundlag: ${displayScore(result.confidence)}/5`,
+      `   Status: ${result.status.label}`,
+      `   Link: ${normalizeInitiativeLink(result.assessment.initiativeLink) || "-"}`,
+      ""
+    );
+  });
+
+  lines.push(
+    `${BRANDING.output.preparedByLabel}: ${BRANDING.organization.name} / ${BRANDING.facilitator.name}`,
+    `${BRANDING.output.contactLabel}: ${BRANDING.facilitator.email} / ${BRANDING.facilitator.phone}`,
+    `Web: ${BRANDING.organization.website}`
+  );
+
+  return lines.join("\n");
 }
 
 function downloadJsonFile(payload, filenamePrefix) {
@@ -845,13 +923,17 @@ function runPrototypeTests() {
   console.assert(SECTION_THEMES.configuration.card.includes("sky"), "configuration section has its own color theme");
   console.assert(SECTION_THEMES.factorDescriptions.card.includes("amber"), "factor description section has its own color theme");
   console.assert(SECTION_THEMES.scoring.card.includes("emerald"), "initiative scoring section has its own color theme");
-  console.assert(BRANDING.tool.version.includes("multiple-assessments-part1"), "version label reflects multiple assessment work");
+  console.assert(BRANDING.tool.version.includes("portfolio-export"), "version label reflects portfolio export work");
   const testAssessment = createAssessment({ initiativeName: "Testinitiativ" });
   console.assert(testAssessment.id && testAssessment.initiativeName === "Testinitiativ", "assessment factory creates a named assessment");
   console.assert(cloneAssessment(testAssessment).id !== testAssessment.id, "assessment clone gets a new id");
   console.assert(getInitialWorkshopState({ assessments: [testAssessment], activeAssessmentId: testAssessment.id }).activeAssessmentId === testAssessment.id, "initial workshop state preserves active assessment id");
   const scoredAssessment = createAssessment({ scores: { co2: { low: 6, high: 6, confidence: 3, touched: true }, opex: { low: 6, high: 6, confidence: 3, touched: true }, strategi: { low: 6, high: 6, confidence: 3, touched: true }, kundevaerdi: { low: 6, high: 6, confidence: 3, touched: true }, kapacitet: { low: 6, high: 6, confidence: 3, touched: true }, investering: { low: 6, high: 6, confidence: 3, touched: true }, teknisk: { low: 6, high: 6, confidence: 3, touched: true }, data: { low: 6, high: 6, confidence: 3, touched: true } } });
   console.assert(getAssessmentResult(scoredAssessment).hasMatrixScore, "assessment result supports comparison matrix when both dimensions are scored");
+  const portfolioPayload = buildPortfolioExportPayload({ assessments: [scoredAssessment], assessmentResults: [getAssessmentResult(scoredAssessment)], anchorConfigBank: createAnchorConfigBank() });
+  console.assert(portfolioPayload.portfolio.assessmentCount === 1, "portfolio export includes assessment count");
+  console.assert(portfolioPayload.assessments[0].result.hasMatrixScore, "portfolio export includes matrix-ready result");
+  console.assert(buildPortfolioSummary({ assessmentResults: [getAssessmentResult(scoredAssessment)] }).includes("BUVI/OxF samlet initiativliste"), "portfolio summary has a readable heading");
   console.assert(SHARE_LINK.shortUrl.includes("probalance.dk/buvi"), "share link has a presentation-friendly short URL");
   console.assert(getQrCodeUrl(SHARE_LINK.canonicalUrl).includes("data="), "QR code URL is generated for the public tool link");
   console.assert(getQrCodeUrl(SHARE_LINK.canonicalUrl).includes("api.qrserver.com"), "QR code URL uses the configured QR generator");
@@ -1448,6 +1530,8 @@ export default function BuviScoringPrototype() {
   const factorDescriptionGroups = groupFactorsByDimension(factors);
   const assessmentResults = useMemo(() => assessments.map((assessment) => getAssessmentResult(assessment)), [assessments]);
   const scoredAssessmentResults = assessmentResults.filter((result) => result.hasMatrixScore);
+  const portfolioExportPayload = useMemo(() => buildPortfolioExportPayload({ assessments, assessmentResults, anchorConfigBank }), [assessments, assessmentResults, anchorConfigBank]);
+  const portfolioSummary = useMemo(() => buildPortfolioSummary({ assessmentResults }), [assessmentResults]);
 
   const hasMatrixScore = Number.isFinite(valueBest) && Number.isFinite(feasibilityBest);
   const hasMatrixRange = Number.isFinite(valueLow) && Number.isFinite(valueHigh) && Number.isFinite(feasibilityLow) && Number.isFinite(feasibilityHigh);
@@ -1546,7 +1630,10 @@ export default function BuviScoringPrototype() {
                 <button type="button" onClick={createNewAssessment} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Nyt initiativ</button>
                 <button type="button" onClick={duplicateActiveAssessment} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Duplikér</button>
                 <button type="button" onClick={deleteActiveAssessment} disabled={assessments.length <= 1} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">Slet</button>
+                <button type="button" onClick={() => { const ok = downloadJsonFile(portfolioExportPayload, "buvi-samlet-initiativliste"); setExportStatus(ok ? "Samlet initiativliste eksporteret" : "Portfolio-eksport fejlede"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Eksportér samlet JSON</button>
+                <button type="button" onClick={async () => { const ok = await copyTextToClipboard(portfolioSummary); setExportStatus(ok ? "Samlet initiativliste kopieret" : "Kunne ikke kopiere samlet liste"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér samlet liste</button>
               </div>
+              {exportStatus && <div className="mt-3 rounded-xl bg-white p-3 text-xs text-slate-600 ring-1 ring-slate-200">{exportStatus}</div>}
             </div>
           </CardContent>
         </Card>
@@ -1617,16 +1704,37 @@ export default function BuviScoringPrototype() {
             </div>
             <div className="grid gap-4 xl:grid-cols-2">
               {[
-                { key: "value", title: "Værdifaktorer", dim: "Værdi", factors: factorDescriptionGroups.value, tone: "dark" },
-                { key: "feasibility", title: "Gennemførlighedsfaktorer", dim: "Gennemførlighed", factors: factorDescriptionGroups.feasibility, tone: "blue" },
+                {
+                  key: "value",
+                  title: "Værdifaktorer",
+                  dim: "Værdi",
+                  factors: factorDescriptionGroups.value,
+                  badgeTone: "dark",
+                  wrapperClass: "border-l-4 border-l-slate-900 bg-slate-50 ring-slate-200",
+                  cardClass: "border-slate-300 bg-white",
+                  note: "Fælles beskrivelser for effekt, værdi og strategisk relevans.",
+                },
+                {
+                  key: "feasibility",
+                  title: "Gennemførlighedsfaktorer",
+                  dim: "Gennemførlighed",
+                  factors: factorDescriptionGroups.feasibility,
+                  badgeTone: "blue",
+                  wrapperClass: "border-l-4 border-l-sky-500 bg-sky-50/60 ring-sky-200",
+                  cardClass: "border-sky-200 bg-white",
+                  note: "Fælles beskrivelser for realisme, dokumentation og praktisk gennemførelse.",
+                },
               ].map((group) => (
-                <section key={group.key} className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                  <div className="mb-4 flex items-center justify-between gap-3">
+                <section key={group.key} className={`rounded-2xl p-4 ring-1 ${group.wrapperClass}`}>
+                  <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <h3 className="text-base font-semibold">{group.title}</h3>
-                      <p className="mt-1 text-xs text-slate-500">{group.factors.length} fælles faktorbeskrivelse{group.factors.length === 1 ? "" : "r"}</p>
+                      <div className="flex items-center gap-2">
+                        <Badge tone={group.badgeTone}>{group.dim}</Badge>
+                        <h3 className="text-base font-semibold">{group.title}</h3>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-600">{group.note}</p>
                     </div>
-                    <Badge tone={group.tone}>{group.dim}</Badge>
+                    <Badge>{group.factors.length} faktor{group.factors.length === 1 ? "" : "er"}</Badge>
                   </div>
                   <div className="space-y-4">
                     {group.factors.map((factor) => {
@@ -1634,10 +1742,10 @@ export default function BuviScoringPrototype() {
                       const factorAnchorStyle = getFactorAnchorStyle(anchorConfigBank, factor, anchorStyle);
                       const anchors = buildAnchors(factor, centerConfig, factorAnchorStyle);
                       return (
-                        <article key={factor.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <article key={factor.id} className={`rounded-2xl border p-4 ${group.cardClass}`}>
                           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                             <div>
-                              <div className="flex flex-wrap items-center gap-2"><Badge tone={group.tone}>{factor.dim}</Badge><h4 className="font-semibold">{factor.name}</h4><Badge>{anchorStyleOptions.find((item) => item.id === factorAnchorStyle)?.name || factorAnchorStyle}</Badge></div>
+                              <div className="flex flex-wrap items-center gap-2"><Badge tone={group.badgeTone}>{factor.dim}</Badge><h4 className="font-semibold">{factor.name}</h4><Badge>{anchorStyleOptions.find((item) => item.id === factorAnchorStyle)?.name || factorAnchorStyle}</Badge></div>
                               <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">{factor.tags.slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
                             </div>
                             
