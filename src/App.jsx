@@ -35,7 +35,7 @@ const BRANDING = {
   tool: {
     name: "BUVI/OxF scoringsværktøj",
     subtitle: "Konfigurerbart workshopværktøj til vurdering af bæredygtighedsinitiativer",
-    version: "v0.3.7-comment-nudges",
+    version: "v0.3.8-onboarding-clarity",
     context: "Udviklet til workshopbrug i BUVI bæredygtighedsnetværket",
   },
   output: {
@@ -206,9 +206,9 @@ const initiativeTypes = [
 ];
 
 const maturityOptions = [
-  { id: "screening", name: "Screening", factorLimit: 8, hint: "Få faktorer, hurtigt overblik, høj usikkerhed accepteres" },
-  { id: "workshop", name: "Workshop-standard", factorLimit: 12, hint: "God balance mellem dialog, scoring og konkret næste skridt" },
-  { id: "business_case", name: "Business case", factorLimit: 16, hint: "Flere faktorer, tydeligere datakrav og økonomisk vurdering" },
+  { id: "screening", name: "Hurtig screening", factorLimit: 8, hint: "Få faktorer, hurtigt overblik, høj usikkerhed accepteres" },
+  { id: "workshop", name: "Workshop – fælles vurdering og dialog", factorLimit: 12, hint: "God balance mellem dialog, scoring og konkret næste skridt" },
+  { id: "business_case", name: "Business case – bedre data og økonomi", factorLimit: 16, hint: "Flere faktorer, tydeligere datakrav og økonomisk vurdering" },
   { id: "kommunikation", name: "Kommunikation / rapportering", factorLimit: 14, hint: "Dokumentation, verificerbarhed og greenwashing-risiko vægtes højere" },
 ];
 
@@ -717,6 +717,11 @@ function commentNudgeText(score) {
   return "Notér kort antagelser, uenigheder, databehov eller næste afklaring for denne score.";
 }
 
+function scrollToSection(id) {
+  if (typeof document === "undefined") return;
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function buildWorkshopSummary({ company, directType, maturityOption, initiativeName, initiativeLink, valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh, confidence, status, roiProxy, factorCounts, overallNotes }) {
   const lines = [
     "BUVI/OxF workshopvurdering",
@@ -731,8 +736,8 @@ function buildWorkshopSummary({ company, directType, maturityOption, initiativeN
   lines.push(
     `Værdi: ${displayScore(valueBest)} (${displayScore(valueLow)}-${displayScore(valueHigh)})`,
     `Gennemførlighed: ${displayScore(feasibilityBest)} (${displayScore(feasibilityLow)}-${displayScore(feasibilityHigh)})`,
-    `Datagrundlag: ${displayScore(confidence)}/5`,
-    `ROI-proxy: ${Number.isFinite(roiProxy) ? roiProxy.toFixed(0) : "-"}`,
+    `Datagrundlag / sikkerhed: ${displayScore(confidence)}/5`,
+    `Prioriteringsindikator: ${Number.isFinite(roiProxy) ? roiProxy.toFixed(0) : "-"}`,
     `Status: ${status.label}`,
     `Faktorbalance: ${factorCounts.value} Værdi / ${factorCounts.feasibility} Gennemførlighed`
   );
@@ -760,7 +765,7 @@ function buildWorkshopSummary({ company, directType, maturityOption, initiativeN
 function buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyle, factorCounts, factors, scores, anchorConfigBank, result, overallNotes }) {
   return {
     schemaVersion: "buvi-scoretool-export-v0.2",
-    appVersion: "v0.3.7-comment-nudges",
+    appVersion: "v0.3.8-onboarding-clarity",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     anchorConfigBank,
@@ -806,7 +811,7 @@ function buildExportPayload({ company, directType, maturityOption, initiativeNam
 function buildPortfolioExportPayload({ assessments, assessmentResults, anchorConfigBank }) {
   return {
     schemaVersion: "buvi-scoretool-portfolio-export-v0.1",
-    appVersion: "v0.3.7-comment-nudges",
+    appVersion: "v0.3.8-onboarding-clarity",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     exportedAt: new Date().toISOString(),
@@ -963,7 +968,8 @@ function runPrototypeTests() {
   console.assert(SECTION_THEMES.configuration.card.includes("sky"), "configuration section has its own color theme");
   console.assert(SECTION_THEMES.factorDescriptions.card.includes("amber"), "factor description section has its own color theme");
   console.assert(SECTION_THEMES.scoring.card.includes("emerald"), "initiative scoring section has its own color theme");
-  console.assert(BRANDING.tool.version.includes("comment-nudges"), "version label reflects comment nudge work");
+  console.assert(BRANDING.tool.version.includes("onboarding-clarity"), "version label reflects onboarding clarity work");
+  console.assert(maturityOptions[0].name.includes("Hurtig screening"), "maturity label uses workshop-oriented language");
   const testAssessment = createAssessment({ initiativeName: "Testinitiativ" });
   console.assert(testAssessment.id && testAssessment.initiativeName === "Testinitiativ", "assessment factory creates a named assessment");
   console.assert(cloneAssessment(testAssessment).id !== testAssessment.id, "assessment clone gets a new id");
@@ -1052,6 +1058,35 @@ function SectionHeader({ label, title, theme, children }) {
       </div>
       {children && <div className="mt-2 text-sm text-slate-600">{children}</div>}
     </div>
+  );
+}
+
+function StartHereGuide() {
+  const steps = [
+    "Opret eller vælg initiativ",
+    "Vælg virksomhed, type og vurderingsniveau",
+    "Tilpas kun scoreforklaringer, hvis standarden ikke passer",
+    "Score det aktive initiativ og skriv korte kommentarer",
+    "Sammenlign initiativer og lav PDF til opsamling",
+  ];
+  return (
+    <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/40">
+      <CardContent className="p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="mb-2 flex items-center gap-2"><SectionIcon label="▶" theme={SECTION_THEMES.scoring} /><h2 className="text-lg font-semibold">Start her</h2></div>
+            <p className="max-w-4xl text-sm text-slate-700">Brug værktøjet som beslutningsstøtte i workshoppen. Scoren er kun halvdelen af outputtet; kommentarer, antagelser og databehov er lige så vigtige.</p>
+            <div className="mt-4 grid gap-2 md:grid-cols-5">
+              {steps.map((step, index) => <div key={step} className="rounded-xl bg-white p-3 text-xs leading-relaxed ring-1 ring-emerald-200"><div className="mb-1 font-semibold text-emerald-900">{index + 1}. trin</div><div className="text-slate-700">{step}</div></div>)}
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col">
+            <button type="button" onClick={() => scrollToSection("section-scoring")} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Gå til scoring</button>
+            <button type="button" onClick={() => scrollToSection("section-factor-descriptions")} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Se scoreforklaringer</button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1505,7 +1540,7 @@ function PrintReport({ company, directType, maturityOption, initiativeName, init
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Værdi</div><div className="text-2xl font-semibold">{displayScore(valueBest)}</div><div className="text-xs text-slate-500">Interval {displayScore(valueLow)}-{displayScore(valueHigh)}</div></div>
             <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Gennemførlighed</div><div className="text-2xl font-semibold">{displayScore(feasibilityBest)}</div><div className="text-xs text-slate-500">Interval {displayScore(feasibilityLow)}-{displayScore(feasibilityHigh)}</div></div>
-            <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Datagrundlag</div><div className="text-2xl font-semibold">{displayScore(confidence)}/5</div><div className="text-xs text-slate-500">ROI-proxy {Number.isFinite(roiProxy) ? roiProxy.toFixed(0) : "-"}</div></div>
+            <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Datagrundlag / sikkerhed</div><div className="text-2xl font-semibold">{displayScore(confidence)}/5</div><div className="text-xs text-slate-500">Prioriteringsindikator {Number.isFinite(roiProxy) ? roiProxy.toFixed(0) : "-"}</div></div>
           </div>
           <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
             <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200"><span className="font-semibold">Status:</span> {status.label}</div>
@@ -1798,8 +1833,8 @@ export default function BuviScoringPrototype() {
                 <Badge>{BRANDING.tool.name} {BRANDING.tool.version}</Badge>
                 <Badge tone="green">Anchor-baseret scoring</Badge>
               </div>
-              <h1 className="text-3xl font-semibold tracking-tight">Konfigurerbart scoringsværktøj</h1>
-              <p className="mt-2 max-w-3xl text-sm text-slate-600">{BRANDING.tool.subtitle}. Vælg virksomhed, initiativtype og scorebeskrivelser. Brugeren klikker på den anchor statement, der passer bedst, og tallet følger automatisk med.</p>
+              <h1 className="text-3xl font-semibold tracking-tight">Vurder og sammenlign bæredygtighedsinitiativer</h1>
+              <p className="mt-2 max-w-3xl text-sm text-slate-600">Start med initiativet, score faktorerne, fasthold drøftelserne og brug matrix/PDF som beslutningsgrundlag.</p>
               <BrandingContactBlock compact className="mt-3" />
             </div>
           </div>
@@ -1820,6 +1855,8 @@ export default function BuviScoringPrototype() {
             </div>
           </CardContent>
         </Card>
+
+        <StartHereGuide />
 
         <ShareLinkQrBlock onCopy={copyShareLink} status={shareStatus} />
 
@@ -1855,7 +1892,7 @@ export default function BuviScoringPrototype() {
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <SelectField label="Virksomhed" value={companyId} onChange={setCompanyId} options={companies} hint={company.label} />
                 <SelectField label="Initiativtype" value={initiativeType} onChange={setInitiativeType} options={initiativeTypes} hint={directType.hint} />
-                <SelectField label="Beslutningsniveau" value={maturity} onChange={setMaturity} options={maturityOptions} hint={maturityOption.hint} />
+                <SelectField label="Hvor grundig skal vurderingen være?" value={maturity} onChange={setMaturity} options={maturityOptions} hint={maturityOption.hint} />
                 <div className="space-y-2">
                   <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Initiativtitel</label>
                   <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2" value={initiativeName} onChange={(event) => setInitiativeName(event.target.value)} />
@@ -1887,8 +1924,8 @@ export default function BuviScoringPrototype() {
           <CardContent className="p-5">
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <SectionHeader label="2" title="Standardlogik for nye faktorbeskrivelser" theme={SECTION_THEMES.standardLogic}>
-                  <p className="max-w-3xl">Bruges som fallback for faktorer uden egen beskrivelseslogik. De konkrete valg styres pr. faktor i sektion 3.</p>
+                <SectionHeader label="2" title="Standardforklaring, hvis faktoren ikke tilpasses" theme={SECTION_THEMES.standardLogic}>
+                  <p className="max-w-3xl">Hvis I ikke ændrer en faktor, bruger værktøjet denne standardforklaring for score 0, 3, 6, 9 og 12.</p>
                 </SectionHeader>
               </div>
             </div>
@@ -1903,14 +1940,17 @@ export default function BuviScoringPrototype() {
           </CardContent>
         </Card>
 
-        <Card className={SECTION_THEMES.factorDescriptions.card}>
+        <Card id="section-factor-descriptions" className={SECTION_THEMES.factorDescriptions.card}>
           <CardContent className="p-5">
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <SectionHeader label="3" title="Fælles faktorbeskrivelser" theme={SECTION_THEMES.factorDescriptions}>
-                  <p className="max-w-4xl">Redigér fælles scoreforståelse pr. faktor. Den konkrete scoring, kommentarer og datagrundlag ligger i næste sektion.</p>
+                <SectionHeader label="3" title="Fælles scoreforklaring for faktorer" theme={SECTION_THEMES.factorDescriptions}>
+                  <p className="max-w-4xl">Her tilpasser I, hvad score 0, 3, 6, 9 og 12 betyder for hver faktor. Dette er ikke selve scoringen; det aktive initiativ scores i næste sektion.</p>
                 </SectionHeader>
               </div>
+            </div>
+            <div className="mb-4 rounded-2xl bg-white p-4 text-sm leading-relaxed text-amber-900 ring-1 ring-amber-200">
+              <span className="font-semibold">Vigtigt:</span> Ændringer her gælder som fælles scoreforklaring for alle initiativer, der bruger faktoren. Scorevalg, kommentarer og datagrundlag registreres først i sektion 4.
             </div>
             <div className="grid gap-4 xl:grid-cols-2">
               {[
@@ -1988,11 +2028,11 @@ export default function BuviScoringPrototype() {
         </Card>
 
         <div className="grid gap-4 xl:grid-cols-3">
-          <Card className={`xl:col-span-2 ${SECTION_THEMES.scoring.card}`}>
+          <Card id="section-scoring" className={`xl:col-span-2 ${SECTION_THEMES.scoring.card}`}>
             <CardContent className="p-5">
               <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <div className="flex items-center gap-2"><SectionIcon label="4" theme={SECTION_THEMES.scoring} /><h2 className="text-lg font-semibold">Initiativscoring</h2></div>
+                  <div className="flex items-center gap-2"><SectionIcon label="4" theme={SECTION_THEMES.scoring} /><h2 className="text-lg font-semibold">Score det aktive initiativ</h2></div>
                   <p className="mt-2 text-sm text-slate-600">Kommentarerne er en del af workshopresultatet. Brug dem til at fastholde antagelser, uenigheder, databehov og beslutningspunkter.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -2062,7 +2102,7 @@ export default function BuviScoringPrototype() {
 
                             <div className="mt-4 grid gap-3 md:grid-cols-[1fr_2fr]">
                               <div>
-                                <div className="mb-1 flex justify-between text-xs"><span>Datagrundlag</span><span>{score.confidence}/5</span></div>
+                                <div className="mb-1 flex justify-between text-xs"><span>Datagrundlag / sikkerhed</span><span>{score.confidence}/5</span></div>
                                 <input type="range" min="1" max="5" step="1" value={score.confidence} onChange={(event) => setScore(factor.id, "confidence", Number(event.target.value))} className="w-full accent-slate-900" />
                                 <div className="mt-2 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-700 ring-1 ring-slate-200">{DATA_CONFIDENCE_DESCRIPTIONS[score.confidence]}</div>
                               </div>
@@ -2096,7 +2136,7 @@ export default function BuviScoringPrototype() {
                     <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Værdi</div><div className="text-3xl font-semibold">{displayScore(valueBest)}</div><div className="text-xs text-slate-500">Interval {displayScore(valueLow)}-{displayScore(valueHigh)}</div></div>
                     <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Gennemførlighed</div><div className="text-3xl font-semibold">{displayScore(feasibilityBest)}</div><div className="text-xs text-slate-500">Interval {displayScore(feasibilityLow)}-{displayScore(feasibilityHigh)}</div></div>
                   </div>
-                  <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="flex items-center justify-between"><div><div className="text-xs text-slate-500">ROI-proxy</div><div className="text-2xl font-semibold">{Number.isFinite(roiProxy) ? roiProxy.toFixed(0) : "-"}</div></div><div><div className="text-xs text-slate-500">Datagrundlag</div><div className="text-2xl font-semibold">{confidence.toFixed(1)}/5</div></div></div></div>
+                  <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="flex items-center justify-between"><div><div className="text-xs text-slate-500">Prioriteringsindikator</div><div className="text-2xl font-semibold">{Number.isFinite(roiProxy) ? roiProxy.toFixed(0) : "-"}</div></div><div><div className="text-xs text-slate-500">Datagrundlag / sikkerhed</div><div className="text-2xl font-semibold">{confidence.toFixed(1)}/5</div></div></div></div>
                   <div className={`rounded-2xl p-4 ring-1 ${commentStats.missingCommentCount > 0 ? "bg-amber-50 ring-amber-200" : "bg-emerald-50 ring-emerald-200"}`}><div className="text-xs text-slate-500">Kommentarstatus</div><div className="mt-1 font-semibold">{commentStats.commentedScoreCount}/{commentStats.scoredCount || 0} scorede faktorer har kommentarer</div><div className="mt-1 text-xs text-slate-600">{commentStats.missingCommentCount > 0 ? `${commentStats.missingCommentCount} scorede faktor(er) mangler kort note om drøftelse eller databehov.` : "Alle scorede faktorer har dokumenteret kommentar."}</div></div>
                   <div className={`rounded-2xl p-4 ring-1 ${statusClass}`}><div className="flex items-start gap-2"><Icon label={status.tone === "green" ? "OK" : "i"} /><div><div className="font-semibold">{status.label}</div><div className="text-sm text-slate-600">Scoren er et beslutningsstøtteværktøj, ikke en automatisk beslutning.</div></div></div></div>
                 </div>
@@ -2109,25 +2149,25 @@ export default function BuviScoringPrototype() {
                 <div className="space-y-4">
                   <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
                     <div className="mb-3">
-                      <div className="text-sm font-semibold">Aktiv vurdering</div>
-                      <div className="mt-1 text-xs text-slate-500">Eksportér eller print den vurdering, der er valgt som aktivt initiativ.</div>
+                      <div className="text-sm font-semibold">Dette initiativ</div>
+                      <div className="mt-1 text-xs text-slate-500">Lav PDF, kopiér tekst eller gem datafil for det aktive initiativ.</div>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
-                      <button type="button" onClick={() => { const ok = downloadJsonFile(exportPayload, initiativeName || "buvi-vurdering"); setExportStatus(ok ? "Aktiv vurdering eksporteret som JSON" : "JSON-eksport fejlede"); }} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Eksportér JSON</button>
-                      <button type="button" onClick={async () => { const ok = await copyTextToClipboard(workshopSummary); setExportStatus(ok ? "Opsummering kopieret" : "Kunne ikke kopiere opsummering"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér opsummering</button>
-                      <button type="button" onClick={() => { setShowPrintReport(true); setExportStatus("Print-/PDF-visning åbnet"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Åbn print/PDF</button>
+                      <button type="button" onClick={() => { const ok = downloadJsonFile(exportPayload, initiativeName || "buvi-vurdering"); setExportStatus(ok ? "Aktiv vurdering eksporteret som JSON" : "JSON-eksport fejlede"); }} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Gem datafil</button>
+                      <button type="button" onClick={async () => { const ok = await copyTextToClipboard(workshopSummary); setExportStatus(ok ? "Opsummering kopieret" : "Kunne ikke kopiere opsummering"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér tekst til mail/Word/PowerPoint</button>
+                      <button type="button" onClick={() => { setShowPrintReport(true); setExportStatus("Print-/PDF-visning åbnet"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Lav PDF for dette initiativ</button>
                     </div>
                   </div>
 
                   <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
                     <div className="mb-3">
-                      <div className="text-sm font-semibold">Samlet initiativliste</div>
-                      <div className="mt-1 text-xs text-slate-500">Eksportér eller kopiér hele porteføljen med alle lokale initiativer.</div>
+                      <div className="text-sm font-semibold">Alle initiativer i workshoppen</div>
+                      <div className="mt-1 text-xs text-slate-500">Lav samlet workshop-PDF, kopiér tekst eller gem datafil for hele porteføljen.</div>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
-                      <button type="button" onClick={() => { const ok = downloadJsonFile(portfolioExportPayload, "buvi-samlet-initiativliste"); setExportStatus(ok ? "Samlet initiativliste eksporteret" : "Portfolio-eksport fejlede"); }} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Eksportér samlet JSON</button>
-                      <button type="button" onClick={async () => { const ok = await copyTextToClipboard(portfolioSummary); setExportStatus(ok ? "Samlet initiativliste kopieret" : "Kunne ikke kopiere samlet liste"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér samlet liste</button>
-                      <button type="button" onClick={() => { setShowPortfolioPrintReport(true); setExportStatus("Portefølje print-/PDF-visning åbnet"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Åbn portefølje-PDF</button>
+                      <button type="button" onClick={() => { const ok = downloadJsonFile(portfolioExportPayload, "buvi-samlet-initiativliste"); setExportStatus(ok ? "Samlet initiativliste eksporteret" : "Portfolio-eksport fejlede"); }} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Gem samlet datafil</button>
+                      <button type="button" onClick={async () => { const ok = await copyTextToClipboard(portfolioSummary); setExportStatus(ok ? "Samlet initiativliste kopieret" : "Kunne ikke kopiere samlet liste"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér samlet tekst</button>
+                      <button type="button" onClick={() => { setShowPortfolioPrintReport(true); setExportStatus("Portefølje print-/PDF-visning åbnet"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Lav samlet workshop-PDF</button>
                     </div>
                   </div>
 
