@@ -35,7 +35,7 @@ const BRANDING = {
   tool: {
     name: "BUVI/OxF scoringsværktøj",
     subtitle: "Konfigurerbart workshopværktøj til vurdering af bæredygtighedsinitiativer",
-    version: "v0.2.14-section-color-coding",
+    version: "v0.2.15-grouped-scoring-factors",
     context: "Udviklet til workshopbrug i BUVI bæredygtighedsnetværket",
   },
   output: {
@@ -674,7 +674,7 @@ function buildWorkshopSummary({ company, directType, maturityOption, initiativeN
 function buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyle, factorCounts, factors, scores, anchorConfigBank, result, overallNotes }) {
   return {
     schemaVersion: "buvi-scoretool-export-v0.2",
-    appVersion: "v0.2.14-section-color-coding",
+    appVersion: "v0.2.15-grouped-scoring-factors",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     anchorConfigBank,
@@ -1520,45 +1520,83 @@ export default function BuviScoringPrototype() {
                 </div>
               </div>
 
-              <div className="space-y-5">
-                {factors.map((factor) => {
-                  const score = normalizeScoreRange(scores[factor.id] || { low: null, high: null, confidence: 2, assumption: "", touched: false });
-                  const centerConfig = getCenterConfig(factor);
-                  const factorAnchorStyle = getFactorAnchorStyle(anchorConfigBank, factor, anchorStyle);
-                  const anchors = buildAnchors(factor, centerConfig, factorAnchorStyle);
-                  const best = bestScore(score);
-                  return (
-                    <article key={factor.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-                      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2"><Badge tone={factor.dim === "Værdi" ? "dark" : "blue"}>{factor.dim}</Badge><h3 className="font-semibold">{factor.name}</h3></div>
-                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">{factor.tags.slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
+              <div className="space-y-6">
+                {[
+                  {
+                    key: "value",
+                    title: "Værdifaktorer",
+                    dim: "Værdi",
+                    factors: factorDescriptionGroups.value,
+                    badgeTone: "dark",
+                    wrapperClass: "border-l-4 border-l-slate-900 bg-slate-50 ring-slate-200",
+                    cardClass: "border-slate-300 bg-white",
+                    note: "Vurderer initiativets effekt, værdi og strategiske relevans.",
+                  },
+                  {
+                    key: "feasibility",
+                    title: "Gennemførlighedsfaktorer",
+                    dim: "Gennemførlighed",
+                    factors: factorDescriptionGroups.feasibility,
+                    badgeTone: "blue",
+                    wrapperClass: "border-l-4 border-l-sky-500 bg-sky-50/60 ring-sky-200",
+                    cardClass: "border-sky-200 bg-white",
+                    note: "Vurderer hvor realistisk, dokumenterbart og praktisk initiativet er at gennemføre.",
+                  },
+                ].map((group) => (
+                  <section key={group.key} className={`rounded-2xl p-4 ring-1 ${group.wrapperClass}`}>
+                    <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Badge tone={group.badgeTone}>{group.dim}</Badge>
+                          <h3 className="text-base font-semibold">{group.title}</h3>
                         </div>
-                        <div className="grid min-w-64 grid-cols-3 gap-2 text-center text-xs">
-                          <div className="rounded-xl bg-sky-50 p-2 ring-1 ring-sky-200"><div className="text-slate-500">Lav</div><div className="text-lg font-semibold text-sky-900">{displayRawScore(score.low)}</div></div>
-                          <div className="rounded-xl bg-slate-50 p-2 ring-1 ring-slate-200"><div className="text-slate-500">Bedste bud</div><div className="text-lg font-semibold">{displayRawScore(best)}</div></div>
-                          <div className="rounded-xl bg-emerald-50 p-2 ring-1 ring-emerald-200"><div className="text-slate-500">Høj</div><div className="text-lg font-semibold text-emerald-900">{displayRawScore(score.high)}</div></div>
-                        </div>
+                        <p className="mt-1 text-xs text-slate-600">{group.note}</p>
                       </div>
-                      <div className="mt-3 rounded-2xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-600 ring-1 ring-slate-200">
-                        Anchor statements herunder kommer fra den fælles faktorbeskrivelse i sektion 3. Klik for at score det aktive initiativ; score, datagrundlag og kommentar gælder kun dette initiativ.
-                      </div>
+                      <Badge>{group.factors.length} faktor{group.factors.length === 1 ? "" : "er"}</Badge>
+                    </div>
 
-                      <div className="mt-4 grid gap-3 md:grid-cols-5">
-                        {SCORE_LEVELS.map((level) => <ScoreAnchorButton key={level} level={level} text={anchors[level]} selectedLow={score.touched && score.low === level} selectedHigh={score.touched && score.high === level} onClick={() => setScore(factor.id, "anchor", level)} />)}
-                      </div>
+                    <div className="space-y-5">
+                      {group.factors.map((factor) => {
+                        const score = normalizeScoreRange(scores[factor.id] || { low: null, high: null, confidence: 2, assumption: "", touched: false });
+                        const centerConfig = getCenterConfig(factor);
+                        const factorAnchorStyle = getFactorAnchorStyle(anchorConfigBank, factor, anchorStyle);
+                        const anchors = buildAnchors(factor, centerConfig, factorAnchorStyle);
+                        const best = bestScore(score);
+                        return (
+                          <article key={factor.id} className={`rounded-2xl border p-4 ${group.cardClass}`}>
+                            <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2"><Badge tone={group.badgeTone}>{factor.dim}</Badge><h3 className="font-semibold">{factor.name}</h3><Badge>{anchorStyleOptions.find((item) => item.id === factorAnchorStyle)?.name || factorAnchorStyle}</Badge></div>
+                                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">{factor.tags.slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
+                              </div>
+                              <div className="grid min-w-64 grid-cols-3 gap-2 text-center text-xs">
+                                <div className="rounded-xl bg-sky-50 p-2 ring-1 ring-sky-200"><div className="text-slate-500">Lav</div><div className="text-lg font-semibold text-sky-900">{displayRawScore(score.low)}</div></div>
+                                <div className="rounded-xl bg-slate-50 p-2 ring-1 ring-slate-200"><div className="text-slate-500">Bedste bud</div><div className="text-lg font-semibold">{displayRawScore(best)}</div></div>
+                                <div className="rounded-xl bg-emerald-50 p-2 ring-1 ring-emerald-200"><div className="text-slate-500">Høj</div><div className="text-lg font-semibold text-emerald-900">{displayRawScore(score.high)}</div></div>
+                              </div>
+                            </div>
+                            <div className={`mt-3 rounded-2xl p-3 text-xs leading-relaxed ring-1 ${group.key === "value" ? "bg-slate-50 text-slate-600 ring-slate-200" : "bg-sky-50 text-sky-700 ring-sky-200"}`}>
+                              Anchor statements herunder kommer fra den fælles faktorbeskrivelse i sektion 3. Klik for at score det aktive initiativ; score, datagrundlag og kommentar gælder kun dette initiativ.
+                            </div>
 
-                      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_2fr]">
-                        <div>
-                          <div className="mb-1 flex justify-between text-xs"><span>Datagrundlag</span><span>{score.confidence}/5</span></div>
-                          <input type="range" min="1" max="5" step="1" value={score.confidence} onChange={(event) => setScore(factor.id, "confidence", Number(event.target.value))} className="w-full accent-slate-900" />
-                          <div className="mt-2 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-700 ring-1 ring-slate-200">{DATA_CONFIDENCE_DESCRIPTIONS[score.confidence]}</div>
-                        </div>
-                        <textarea className="min-h-16 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none ring-slate-300 focus:ring-2" placeholder="Antagelser eller databehov for denne faktor..." value={score.assumption || ""} onChange={(event) => setScores((prev) => ({ ...prev, [factor.id]: { ...score, assumption: event.target.value } }))} />
-                      </div>
-                    </article>
-                  );
-                })}
+                            <div className="mt-4 grid gap-3 md:grid-cols-5">
+                              {SCORE_LEVELS.map((level) => <ScoreAnchorButton key={level} level={level} text={anchors[level]} selectedLow={score.touched && score.low === level} selectedHigh={score.touched && score.high === level} onClick={() => setScore(factor.id, "anchor", level)} />)}
+                            </div>
+
+                            <div className="mt-4 grid gap-3 md:grid-cols-[1fr_2fr]">
+                              <div>
+                                <div className="mb-1 flex justify-between text-xs"><span>Datagrundlag</span><span>{score.confidence}/5</span></div>
+                                <input type="range" min="1" max="5" step="1" value={score.confidence} onChange={(event) => setScore(factor.id, "confidence", Number(event.target.value))} className="w-full accent-slate-900" />
+                                <div className="mt-2 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-700 ring-1 ring-slate-200">{DATA_CONFIDENCE_DESCRIPTIONS[score.confidence]}</div>
+                              </div>
+                              <textarea className="min-h-16 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none ring-slate-300 focus:ring-2" placeholder="Antagelser eller databehov for denne faktor..." value={score.assumption || ""} onChange={(event) => setScores((prev) => ({ ...prev, [factor.id]: { ...score, assumption: event.target.value } }))} />
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
               </div>
             </CardContent>
           </Card>
