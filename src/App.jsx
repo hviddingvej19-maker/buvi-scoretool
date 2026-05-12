@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 
 const SCORE_LEVELS = [0, 3, 6, 9, 12];
 const STORAGE_KEY = "buvi-scoretool-workshop-v3-multiple-assessments";
-const APP_VERSION = "v0.3.19-clean-blank-pdf";
+const APP_VERSION = "BUVI-workshop-release-v0.3.19";
 
 const DATA_CONFIDENCE_DESCRIPTIONS = {
   1: "Meget svagt datagrundlag: scoren bygger primært på mavefornemmelse, generelle antagelser eller AI-estimat uden konkret virksomhedsdata.",
