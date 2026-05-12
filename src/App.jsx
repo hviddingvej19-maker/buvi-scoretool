@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 
 const SCORE_LEVELS = [0, 3, 6, 9, 12];
 const STORAGE_KEY = "buvi-scoretool-workshop-v3-multiple-assessments";
-const APP_VERSION = "v0.3.16-reset-and-switch-fix";
+const APP_VERSION = "v0.3.18-hard-reset-comments";
 
 const DATA_CONFIDENCE_DESCRIPTIONS = {
   1: "Meget svagt datagrundlag: scoren bygger primært på mavefornemmelse, generelle antagelser eller AI-estimat uden konkret virksomhedsdata.",
@@ -290,6 +290,19 @@ function clearSavedWorkshopState() {
   }
 }
 
+function clearAllSavedWorkshopState() {
+  if (typeof window === "undefined") return false;
+  try {
+    Object.keys(window.localStorage)
+      .filter((key) => key.startsWith("buvi-scoretool"))
+      .forEach((key) => window.localStorage.removeItem(key));
+    return true;
+  } catch (error) {
+    console.warn("Kunne ikke nulstille lokal BUVI-data", error);
+    return false;
+  }
+}
+
 function uniqueById(list) {
   return Array.from(new Map(list.map((item) => [item.id, item])).values());
 }
@@ -473,8 +486,16 @@ function buildAnchors(factor, config, anchorStyle = "general") {
   return buildAbsoluteAnchors(factor, config);
 }
 
+function emptyScore() {
+  return { low: null, high: null, confidence: 2, assumption: "", touched: false };
+}
+
 function defaultScores(factors) {
-  return Object.fromEntries(factors.map((factor) => [factor.id, { low: null, high: null, confidence: 2, assumption: "", touched: false }]));
+  return Object.fromEntries(factors.map((factor) => [factor.id, emptyScore()]));
+}
+
+function resetAssessmentContent(assessment) {
+  return { ...assessment, scores: {}, overallNotes: "", updatedAt: new Date().toISOString() };
 }
 
 function isScoreValue(value) {
@@ -875,6 +896,12 @@ function matrixGeometry({ valueBest, feasibilityBest, valueLow, valueHigh, feasi
   };
 }
 
+function getScoredAssessmentEntries(assessmentResults) {
+  return assessmentResults
+    .map((result, originalIndex) => ({ result, originalIndex }))
+    .filter(({ result }) => result.hasMatrixScore);
+}
+
 function runPrototypeTests() {
   const factors = buildFactors("tekstil_workwear", "produkt_cirkularitet", 12);
   console.assert(factors.length <= 12, "buildFactors respects factor limit");
@@ -883,10 +910,12 @@ function runPrototypeTests() {
   console.assert(groupFactorsByDimension(factors).feasibility.every((factor) => factor.dim === "Gennemførlighed"), "feasibility factors are grouped");
   console.assert(normalizeInitiativeLink("example.com") === "https://example.com", "initiative links get protocol");
   console.assert(appendCommentTemplate("Eksisterende note", COMMENT_TEMPLATES[0].text).includes("\nAntagelse:"), "comment template appends on a new line");
-  console.assert(BRANDING.tool.version.includes("reset-and-switch-fix"), "version label reflects reset and switch fix");
+  console.assert(BRANDING.tool.version.includes("hard-reset-comments"), "version label reflects hard reset comments cleanup");
+  console.assert(resetAssessmentContent(createAssessment({ scores: { co2: { ...emptyScore(), assumption: "gammel kommentar" } }, overallNotes: "note" })).scores.co2 === undefined, "reset removes score comments completely");
   const scoredAssessment = createAssessment({ scores: { co2: { low: 6, high: 6, confidence: 3, touched: true }, kapacitet: { low: 6, high: 6, confidence: 3, touched: true } } });
   console.assert(getAssessmentResult(scoredAssessment).hasMatrixScore, "assessment result supports matrix score");
   console.assert(matrixGeometry({ valueBest: 6, feasibilityBest: 6, valueLow: 3, valueHigh: 9, feasibilityLow: 3, feasibilityHigh: 9 }).hasMatrixScore, "matrix geometry handles score point");
+  console.assert(getScoredAssessmentEntries([{ hasMatrixScore: false }, { hasMatrixScore: true }])[0].originalIndex === 1, "scored matrix entries preserve original assessment index");
 }
 
 runPrototypeTests();
@@ -1123,8 +1152,8 @@ function MatrixDiagram({ valueBest, feasibilityBest, valueLow, valueHigh, feasib
 
 function ComparisonMatrixDiagram({ assessmentResults, activeAssessmentId, onSelect, className = "h-80 w-full", labelSize = 5.2 }) {
   const activeResult = assessmentResults.find((result) => result.assessment.id === activeAssessmentId);
-  const activeGeometry = activeResult ? matrixGeometry(activeResult) : null;
-  const scoredResults = assessmentResults.filter((result) => result.hasMatrixScore);
+  const activeGeometry = activeResult?.hasMatrixScore ? matrixGeometry(activeResult) : null;
+  const scoredEntries = getScoredAssessmentEntries(assessmentResults);
   return (
     <svg viewBox="0 0 100 100" className={className} role="img" aria-label="Sammenligningsmatrix med flere initiativer">
       <rect x="8" y="8" width="84" height="84" rx="3" fill="white" stroke="#cbd5e1" />
@@ -1132,14 +1161,14 @@ function ComparisonMatrixDiagram({ assessmentResults, activeAssessmentId, onSele
       <line x1="50" y1="8" x2="50" y2="92" stroke="#e2e8f0" />
       <path d="M 14 86 C 24 64, 40 48, 58 35 C 72 25, 82 18, 90 14" fill="none" stroke="#cbd5e1" strokeDasharray="3 3" />
       {activeGeometry?.hasMatrixRange && <rect x={activeGeometry.rectX} y={activeGeometry.rectY} width={Math.max(2, activeGeometry.rectW)} height={Math.max(2, activeGeometry.rectH)} rx="2" fill="#bfdbfe" opacity="0.5" stroke="#60a5fa" />}
-      {scoredResults.length === 0 && <text x="50" y="51" fontSize={labelSize} textAnchor="middle" fill="#64748b">Ingen initiativer har både værdi- og gennemførlighedsscore endnu</text>}
-      {scoredResults.map((result, index) => {
+      {scoredEntries.length === 0 && <text x="50" y="51" fontSize={labelSize} textAnchor="middle" fill="#64748b">Ingen initiativer har både værdi- og gennemførlighedsscore endnu</text>}
+      {scoredEntries.map(({ result, originalIndex }) => {
         const geometry = matrixGeometry(result);
         const isActive = result.assessment.id === activeAssessmentId;
         return (
           <g key={result.assessment.id} onClick={() => onSelect?.(result.assessment.id)} className="cursor-pointer">
             <circle cx={geometry.pointX} cy={geometry.pointY} r={isActive ? "4.2" : "3"} fill={isActive ? "#0f172a" : "#0284c7"} opacity={isActive ? "1" : "0.72"} stroke="white" strokeWidth="1.2" />
-            <text x={geometry.pointX + 4.2} y={geometry.pointY - 2.6} fontSize={labelSize * 0.7} fill={isActive ? "#0f172a" : "#0369a1"} fontWeight={isActive ? "700" : "600"}>{index + 1}</text>
+            <text x={geometry.pointX + 4.2} y={geometry.pointY - 2.6} fontSize={labelSize * 0.7} fill={isActive ? "#0f172a" : "#0369a1"} fontWeight={isActive ? "700" : "600"}>{originalIndex + 1}</text>
           </g>
         );
       })}
@@ -1390,8 +1419,15 @@ export default function BuviScoringPrototype() {
   const resetActiveScoring = () => {
     const ok = confirmDestructiveAction(`Nulstil scoring, kommentarer og noter for "${activeAssessment.initiativeName || "Ikke navngivet initiativ"}"? Andre initiativer berøres ikke.`);
     if (!ok) return;
-    updateActiveAssessment({ scores: defaultScores(factors), overallNotes: "" });
-    setStorageStatus("Scoring nulstillet for aktivt initiativ");
+    setShowPrintReport(false);
+    setShowPortfolioPrintReport(false);
+    setExportStatus("");
+    setAssessments((prev) => {
+      const nextAssessments = prev.map((assessment) => (assessment.id === activeAssessment.id ? resetAssessmentContent(assessment) : assessment));
+      saveWorkshopState({ anchorConfigBank, activeAssessmentId, assessments: nextAssessments });
+      return nextAssessments;
+    });
+    setStorageStatus("Scoring, kommentarer og noter er nulstillet for aktivt initiativ");
   };
 
   const getCenterConfig = (factor) => getAnchorConfigFromBank(anchorConfigBank, factor);
@@ -1461,7 +1497,7 @@ export default function BuviScoringPrototype() {
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <button type="button" onClick={resetActiveScoring} className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Nulstil scoring</button>
-              <button type="button" onClick={() => { const ok = confirmDestructiveAction("Slet al lokal browserdata for værktøjet? Dette fjerner alle lokale initiativer, scoringer og kommentarer på denne computer."); if (!ok) return; const next = createAssessment(); clearSavedWorkshopState(); setAssessments([next]); setActiveAssessmentId(next.id); setAnchorConfigBank(createAnchorConfigBank()); setSavedAt(null); setStorageStatus("Lokal browserdata er slettet"); }} className="rounded-2xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Slet lokal data</button>
+              <button type="button" onClick={() => { const ok = confirmDestructiveAction("Slet al lokal browserdata for værktøjet? Dette fjerner alle lokale initiativer, scoringer og kommentarer på denne computer."); if (!ok) return; const next = resetAssessmentContent(createAssessment({ scores: {}, overallNotes: "" })); const nextBank = createAnchorConfigBank(); clearAllSavedWorkshopState(); setShowPrintReport(false); setShowPortfolioPrintReport(false); setExportStatus(""); setAssessments([next]); setActiveAssessmentId(next.id); setAnchorConfigBank(nextBank); setSavedAt(null); saveWorkshopState({ anchorConfigBank: nextBank, activeAssessmentId: next.id, assessments: [next] }); setStorageStatus("Al lokal BUVI-data, scoringer og kommentarer er slettet"); }} className="rounded-2xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Slet lokal data</button>
             </div>
           </header>
 
