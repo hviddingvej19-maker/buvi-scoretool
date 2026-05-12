@@ -35,7 +35,7 @@ const BRANDING = {
   tool: {
     name: "BUVI/OxF scoringsværktøj",
     subtitle: "Konfigurerbart workshopværktøj til vurdering af bæredygtighedsinitiativer",
-    version: "v0.3.6-portfolio-factor-comments",
+    version: "v0.3.7-comment-nudges",
     context: "Udviklet til workshopbrug i BUVI bæredygtighedsnetværket",
   },
   output: {
@@ -691,6 +691,32 @@ function getFactorCommentRowsForAssessmentResult(result) {
     .filter((row) => row.comment);
 }
 
+function getCommentStatsForFactors(factors, scores) {
+  const rows = (factors || []).map((factor) => {
+    const score = normalizeScoreRange(scores?.[factor.id] || { low: null, high: null, confidence: 2, assumption: "", touched: false });
+    const hasComment = Boolean(String(score.assumption || "").trim());
+    return { factor, score, hasComment };
+  });
+  const scoredRows = rows.filter((row) => row.score.touched);
+  const scoredWithComments = scoredRows.filter((row) => row.hasComment);
+  const scoredWithoutComments = scoredRows.filter((row) => !row.hasComment);
+  const unscoredWithComments = rows.filter((row) => !row.score.touched && row.hasComment);
+  return {
+    totalFactors: rows.length,
+    scoredCount: scoredRows.length,
+    commentedScoreCount: scoredWithComments.length,
+    missingCommentCount: scoredWithoutComments.length,
+    unscoredCommentCount: unscoredWithComments.length,
+    commentCoverage: scoredRows.length ? scoredWithComments.length / scoredRows.length : 0,
+  };
+}
+
+function commentNudgeText(score) {
+  const normalized = normalizeScoreRange(score || { low: null, high: null, touched: false });
+  if (!normalized.touched) return "Kommentér gerne, hvis faktoren blev drøftet uden at blive scoret.";
+  return "Notér kort antagelser, uenigheder, databehov eller næste afklaring for denne score.";
+}
+
 function buildWorkshopSummary({ company, directType, maturityOption, initiativeName, initiativeLink, valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh, confidence, status, roiProxy, factorCounts, overallNotes }) {
   const lines = [
     "BUVI/OxF workshopvurdering",
@@ -734,7 +760,7 @@ function buildWorkshopSummary({ company, directType, maturityOption, initiativeN
 function buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyle, factorCounts, factors, scores, anchorConfigBank, result, overallNotes }) {
   return {
     schemaVersion: "buvi-scoretool-export-v0.2",
-    appVersion: "v0.3.6-portfolio-factor-comments",
+    appVersion: "v0.3.7-comment-nudges",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     anchorConfigBank,
@@ -780,7 +806,7 @@ function buildExportPayload({ company, directType, maturityOption, initiativeNam
 function buildPortfolioExportPayload({ assessments, assessmentResults, anchorConfigBank }) {
   return {
     schemaVersion: "buvi-scoretool-portfolio-export-v0.1",
-    appVersion: "v0.3.6-portfolio-factor-comments",
+    appVersion: "v0.3.7-comment-nudges",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     exportedAt: new Date().toISOString(),
@@ -937,7 +963,7 @@ function runPrototypeTests() {
   console.assert(SECTION_THEMES.configuration.card.includes("sky"), "configuration section has its own color theme");
   console.assert(SECTION_THEMES.factorDescriptions.card.includes("amber"), "factor description section has its own color theme");
   console.assert(SECTION_THEMES.scoring.card.includes("emerald"), "initiative scoring section has its own color theme");
-  console.assert(BRANDING.tool.version.includes("portfolio-print"), "version label reflects portfolio print work");
+  console.assert(BRANDING.tool.version.includes("comment-nudges"), "version label reflects comment nudge work");
   const testAssessment = createAssessment({ initiativeName: "Testinitiativ" });
   console.assert(testAssessment.id && testAssessment.initiativeName === "Testinitiativ", "assessment factory creates a named assessment");
   console.assert(cloneAssessment(testAssessment).id !== testAssessment.id, "assessment clone gets a new id");
@@ -951,6 +977,9 @@ function runPrototypeTests() {
   console.assert(typeof PortfolioPrintReport === "function", "portfolio print report component is available");
   const commentedAssessment = createAssessment({ scores: { co2: { low: 6, high: 6, confidence: 3, touched: true, assumption: "  vigtig drøftelse  " } } });
   console.assert(getFactorCommentRowsForAssessmentResult(getAssessmentResult(commentedAssessment))[0].comment === "vigtig drøftelse", "portfolio print can extract factor comments and discussion notes");
+  const commentStats = getCommentStatsForFactors(coreFactors.slice(0, 2), { co2: { low: 6, high: 6, touched: true, confidence: 3, assumption: "" }, opex: { low: 6, high: 6, touched: true, confidence: 3, assumption: "note" } });
+  console.assert(commentStats.scoredCount === 2 && commentStats.commentedScoreCount === 1 && commentStats.missingCommentCount === 1, "comment stats identify scored factors without comments");
+  console.assert(commentNudgeText({ low: 6, high: 6, touched: true }).includes("antagelser"), "comment nudge prompts workshop documentation for scored factors");
   console.assert(SHARE_LINK.shortUrl.includes("probalance.dk/buvi"), "share link has a presentation-friendly short URL");
   console.assert(getQrCodeUrl(SHARE_LINK.canonicalUrl).includes("data="), "QR code URL is generated for the public tool link");
   console.assert(getQrCodeUrl(SHARE_LINK.canonicalUrl).includes("api.qrserver.com"), "QR code URL uses the configured QR generator");
@@ -1703,6 +1732,7 @@ export default function BuviScoringPrototype() {
     return { factor, centerConfig, anchors, score, anchorStyle: factorAnchorStyle, anchorStyleName: anchorStyleOptions.find((item) => item.id === factorAnchorStyle)?.name || factorAnchorStyle };
   });
   const criticalUnscoredRows = factorReportRows.filter((row) => !row.score.touched && isCriticalUnscoredFactor(row.factor));
+  const commentStats = getCommentStatsForFactors(factors, scores);
   const factorDescriptionGroups = groupFactorsByDimension(factors);
   const assessmentResults = useMemo(() => assessments.map((assessment) => getAssessmentResult(assessment)), [assessments]);
   const scoredAssessmentResults = assessmentResults.filter((result) => result.hasMatrixScore);
@@ -1960,9 +1990,15 @@ export default function BuviScoringPrototype() {
         <div className="grid gap-4 xl:grid-cols-3">
           <Card className={`xl:col-span-2 ${SECTION_THEMES.scoring.card}`}>
             <CardContent className="p-5">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2"><SectionIcon label="4" theme={SECTION_THEMES.scoring} /><h2 className="text-lg font-semibold">Initiativscoring</h2></div>
-                <Badge tone="green">Scoring for aktivt initiativ</Badge>
+              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <div className="flex items-center gap-2"><SectionIcon label="4" theme={SECTION_THEMES.scoring} /><h2 className="text-lg font-semibold">Initiativscoring</h2></div>
+                  <p className="mt-2 text-sm text-slate-600">Kommentarerne er en del af workshopresultatet. Brug dem til at fastholde antagelser, uenigheder, databehov og beslutningspunkter.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge tone="green">Scoring for aktivt initiativ</Badge>
+                  <Badge tone={commentStats.missingCommentCount > 0 ? "amber" : "green"}>Kommentarer {commentStats.commentedScoreCount}/{commentStats.scoredCount || 0}</Badge>
+                </div>
               </div>
 
               <div className="space-y-6">
@@ -2030,7 +2066,10 @@ export default function BuviScoringPrototype() {
                                 <input type="range" min="1" max="5" step="1" value={score.confidence} onChange={(event) => setScore(factor.id, "confidence", Number(event.target.value))} className="w-full accent-slate-900" />
                                 <div className="mt-2 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-700 ring-1 ring-slate-200">{DATA_CONFIDENCE_DESCRIPTIONS[score.confidence]}</div>
                               </div>
-                              <textarea className="min-h-16 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none ring-slate-300 focus:ring-2" placeholder="Antagelser eller databehov for denne faktor..." value={score.assumption || ""} onChange={(event) => setScores((prev) => ({ ...prev, [factor.id]: { ...score, assumption: event.target.value } }))} />
+                              <div className="space-y-2">
+                                <textarea className={`min-h-20 w-full rounded-xl border bg-white p-3 text-sm outline-none ring-slate-300 focus:ring-2 ${score.touched && !factorCommentText({ score }) ? "border-amber-300 ring-1 ring-amber-200" : "border-slate-200"}`} placeholder="Notér antagelser, uenighed, databehov eller næste afklaring for denne faktor..." value={score.assumption || ""} onChange={(event) => setScores((prev) => ({ ...prev, [factor.id]: { ...score, assumption: event.target.value } }))} />
+                                {score.touched && !factorCommentText({ score }) && <div className="rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 ring-1 ring-amber-200">{commentNudgeText(score)}</div>}
+                              </div>
                             </div>
                           </article>
                         );
@@ -2058,6 +2097,7 @@ export default function BuviScoringPrototype() {
                     <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Gennemførlighed</div><div className="text-3xl font-semibold">{displayScore(feasibilityBest)}</div><div className="text-xs text-slate-500">Interval {displayScore(feasibilityLow)}-{displayScore(feasibilityHigh)}</div></div>
                   </div>
                   <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><div className="flex items-center justify-between"><div><div className="text-xs text-slate-500">ROI-proxy</div><div className="text-2xl font-semibold">{Number.isFinite(roiProxy) ? roiProxy.toFixed(0) : "-"}</div></div><div><div className="text-xs text-slate-500">Datagrundlag</div><div className="text-2xl font-semibold">{confidence.toFixed(1)}/5</div></div></div></div>
+                  <div className={`rounded-2xl p-4 ring-1 ${commentStats.missingCommentCount > 0 ? "bg-amber-50 ring-amber-200" : "bg-emerald-50 ring-emerald-200"}`}><div className="text-xs text-slate-500">Kommentarstatus</div><div className="mt-1 font-semibold">{commentStats.commentedScoreCount}/{commentStats.scoredCount || 0} scorede faktorer har kommentarer</div><div className="mt-1 text-xs text-slate-600">{commentStats.missingCommentCount > 0 ? `${commentStats.missingCommentCount} scorede faktor(er) mangler kort note om drøftelse eller databehov.` : "Alle scorede faktorer har dokumenteret kommentar."}</div></div>
                   <div className={`rounded-2xl p-4 ring-1 ${statusClass}`}><div className="flex items-start gap-2"><Icon label={status.tone === "green" ? "OK" : "i"} /><div><div className="font-semibold">{status.label}</div><div className="text-sm text-slate-600">Scoren er et beslutningsstøtteværktøj, ikke en automatisk beslutning.</div></div></div></div>
                 </div>
               </CardContent>
