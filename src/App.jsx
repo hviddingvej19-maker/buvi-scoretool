@@ -1584,3 +1584,4 @@ function GatesCard({ confidence, factors, scores, valueBest, feasibilityBest, ov
 function Footer() {
   return <footer className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"><div className="flex items-center gap-4"><BrandingLogo className="h-20 w-auto" /><BrandingContactBlock /></div><div className="max-w-2xl text-xs leading-relaxed text-slate-500 md:text-right"><p>{BRANDING.output.confidentialityNote}</p><p className="mt-2">{BRANDING.tool.context}</p><p className="mt-2"><span className="font-semibold text-slate-700">Workshoplink:</span> {SHARE_LINK.displayShortUrl}</p></div></div></footer>;
 }
+
