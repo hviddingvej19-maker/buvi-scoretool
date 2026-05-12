@@ -35,7 +35,7 @@ const BRANDING = {
   tool: {
     name: "BUVI/OxF scoringsværktøj",
     subtitle: "Konfigurerbart workshopværktøj til vurdering af bæredygtighedsinitiativer",
-    version: "v0.3.4-export-actions",
+    version: "v0.3.6-portfolio-factor-comments",
     context: "Udviklet til workshopbrug i BUVI bæredygtighedsnetværket",
   },
   output: {
@@ -677,6 +677,20 @@ function factorCommentText(row) {
   return String(row?.score?.assumption || "").trim();
 }
 
+function getFactorCommentRowsForAssessmentResult(result) {
+  const scores = result?.assessment?.scores || {};
+  return (result?.factors || [])
+    .map((factor) => {
+      const score = normalizeScoreRange(scores[factor.id] || { low: null, high: null, confidence: 2, assumption: "", touched: false });
+      return {
+        factor,
+        score,
+        comment: factorCommentText({ score }),
+      };
+    })
+    .filter((row) => row.comment);
+}
+
 function buildWorkshopSummary({ company, directType, maturityOption, initiativeName, initiativeLink, valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh, confidence, status, roiProxy, factorCounts, overallNotes }) {
   const lines = [
     "BUVI/OxF workshopvurdering",
@@ -720,7 +734,7 @@ function buildWorkshopSummary({ company, directType, maturityOption, initiativeN
 function buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyle, factorCounts, factors, scores, anchorConfigBank, result, overallNotes }) {
   return {
     schemaVersion: "buvi-scoretool-export-v0.2",
-    appVersion: "v0.3.4-export-actions",
+    appVersion: "v0.3.6-portfolio-factor-comments",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     anchorConfigBank,
@@ -766,7 +780,7 @@ function buildExportPayload({ company, directType, maturityOption, initiativeNam
 function buildPortfolioExportPayload({ assessments, assessmentResults, anchorConfigBank }) {
   return {
     schemaVersion: "buvi-scoretool-portfolio-export-v0.1",
-    appVersion: "v0.3.4-export-actions",
+    appVersion: "v0.3.6-portfolio-factor-comments",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     exportedAt: new Date().toISOString(),
@@ -923,7 +937,7 @@ function runPrototypeTests() {
   console.assert(SECTION_THEMES.configuration.card.includes("sky"), "configuration section has its own color theme");
   console.assert(SECTION_THEMES.factorDescriptions.card.includes("amber"), "factor description section has its own color theme");
   console.assert(SECTION_THEMES.scoring.card.includes("emerald"), "initiative scoring section has its own color theme");
-  console.assert(BRANDING.tool.version.includes("export-actions"), "version label reflects export action cleanup work");
+  console.assert(BRANDING.tool.version.includes("portfolio-print"), "version label reflects portfolio print work");
   const testAssessment = createAssessment({ initiativeName: "Testinitiativ" });
   console.assert(testAssessment.id && testAssessment.initiativeName === "Testinitiativ", "assessment factory creates a named assessment");
   console.assert(cloneAssessment(testAssessment).id !== testAssessment.id, "assessment clone gets a new id");
@@ -934,6 +948,9 @@ function runPrototypeTests() {
   console.assert(portfolioPayload.portfolio.assessmentCount === 1, "portfolio export includes assessment count");
   console.assert(portfolioPayload.assessments[0].result.hasMatrixScore, "portfolio export includes matrix-ready result");
   console.assert(buildPortfolioSummary({ assessmentResults: [getAssessmentResult(scoredAssessment)] }).includes("BUVI/OxF samlet initiativliste"), "portfolio summary has a readable heading");
+  console.assert(typeof PortfolioPrintReport === "function", "portfolio print report component is available");
+  const commentedAssessment = createAssessment({ scores: { co2: { low: 6, high: 6, confidence: 3, touched: true, assumption: "  vigtig drøftelse  " } } });
+  console.assert(getFactorCommentRowsForAssessmentResult(getAssessmentResult(commentedAssessment))[0].comment === "vigtig drøftelse", "portfolio print can extract factor comments and discussion notes");
   console.assert(SHARE_LINK.shortUrl.includes("probalance.dk/buvi"), "share link has a presentation-friendly short URL");
   console.assert(getQrCodeUrl(SHARE_LINK.canonicalUrl).includes("data="), "QR code URL is generated for the public tool link");
   console.assert(getQrCodeUrl(SHARE_LINK.canonicalUrl).includes("api.qrserver.com"), "QR code URL uses the configured QR generator");
@@ -1255,6 +1272,164 @@ function ComparisonMatrixDiagram({ assessmentResults, activeAssessmentId, onSele
   );
 }
 
+function PortfolioPrintReport({ assessmentResults, activeAssessmentId, onClose }) {
+  const scoredResults = assessmentResults.filter((result) => result.hasMatrixScore);
+  const activeResult = assessmentResults.find((result) => result.assessment.id === activeAssessmentId);
+  return (
+    <div className="print-report-shell fixed inset-0 z-50 overflow-auto bg-white p-6 text-slate-900">
+      <div className="no-print sticky top-0 z-10 mb-6 flex flex-col gap-3 rounded-2xl bg-white/95 p-4 shadow-sm ring-1 ring-slate-200 backdrop-blur md:flex-row md:items-center md:justify-between">
+        <div>
+          <div className="text-sm font-semibold">Portefølje print-/PDF-visning</div>
+          <div className="text-xs text-slate-500">Brug browserens printdialog og vælg “Gem som PDF”, hvis sammenligningen skal gemmes digitalt.</div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => window.print()} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Udskriv / Gem som PDF</button>
+          <button type="button" onClick={onClose} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Luk porteføljevisning</button>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-6xl space-y-6 print:max-w-none">
+        <section className="print-break-inside-avoid rounded-2xl border border-slate-200 p-6">
+          <div className="mb-5 flex flex-col gap-4 border-b border-slate-200 pb-4 md:flex-row md:items-start md:justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start">
+              <BrandingLogo className="h-28 w-auto print:h-24" />
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{BRANDING.tool.name}</div>
+                <h1 className="mt-1 text-2xl font-semibold">Sammenligning af initiativscoringer</h1>
+                <p className="mt-2 text-sm text-slate-600">Porteføljerapport med samlet matrix, initiativliste og dokumenterede faktorkommentarer.</p>
+              </div>
+            </div>
+            <div className="text-left md:text-right">
+              <Badge tone="blue">{BRANDING.tool.version}</Badge>
+              <BrandingContactBlock compact className="mt-3" />
+            </div>
+          </div>
+          <div className="grid gap-3 text-sm md:grid-cols-3">
+            <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200"><span className="font-semibold">Antal initiativer:</span> {assessmentResults.length}</div>
+            <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200"><span className="font-semibold">Scoret i matrix:</span> {scoredResults.length}</div>
+            <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200"><span className="font-semibold">Aktivt initiativ:</span> {activeResult?.assessment?.initiativeName || "-"}</div>
+          </div>
+        </section>
+
+        <section className="print-break-inside-avoid rounded-2xl border border-slate-200 p-6">
+          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Samlet sammenligningsmatrix</h2>
+              <p className="mt-1 text-sm text-slate-600">Alle initiativer med både værdi- og gennemførlighedsscore vises som punkter. Det aktive initiativ er mørkt og viser usikkerhedsinterval.</p>
+            </div>
+            <Badge tone="blue">{scoredResults.length}/{assessmentResults.length} scoret</Badge>
+          </div>
+          <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+            <ComparisonMatrixDiagram assessmentResults={assessmentResults} activeAssessmentId={activeAssessmentId} className="h-96 w-full print:h-80" labelSize={6.2} />
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold">Initiativliste</h2>
+          <div className="mt-4 overflow-hidden rounded-2xl ring-1 ring-slate-200">
+            <table className="w-full border-collapse text-left text-sm">
+              <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600">
+                <tr>
+                  <th className="p-3">#</th>
+                  <th className="p-3">Initiativ</th>
+                  <th className="p-3">Virksomhed / type</th>
+                  <th className="p-3 text-right">Værdi</th>
+                  <th className="p-3 text-right">Gennemførlighed</th>
+                  <th className="p-3 text-right">Data</th>
+                  <th className="p-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assessmentResults.map((result, index) => {
+                  const isActive = result.assessment.id === activeAssessmentId;
+                  return (
+                    <tr key={result.assessment.id} className={isActive ? "bg-slate-900 text-white" : "border-t border-slate-200 bg-white"}>
+                      <td className="p-3 align-top font-semibold">{index + 1}</td>
+                      <td className="p-3 align-top">
+                        <div className="font-semibold">{result.assessment.initiativeName || "Ikke navngivet initiativ"}</div>
+                        {normalizeInitiativeLink(result.assessment.initiativeLink) && <div className={isActive ? "mt-1 break-all text-xs text-slate-200" : "mt-1 break-all text-xs text-slate-500"}>{normalizeInitiativeLink(result.assessment.initiativeLink)}</div>}
+                      </td>
+                      <td className="p-3 align-top"><div>{result.company.name}</div><div className={isActive ? "text-xs text-slate-200" : "text-xs text-slate-500"}>{result.directType.name}</div></td>
+                      <td className="p-3 text-right align-top">{displayScore(result.valueBest)}<div className={isActive ? "text-xs text-slate-200" : "text-xs text-slate-500"}>{displayScore(result.valueLow)}-{displayScore(result.valueHigh)}</div></td>
+                      <td className="p-3 text-right align-top">{displayScore(result.feasibilityBest)}<div className={isActive ? "text-xs text-slate-200" : "text-xs text-slate-500"}>{displayScore(result.feasibilityLow)}-{displayScore(result.feasibilityHigh)}</div></td>
+                      <td className="p-3 text-right align-top">{displayScore(result.confidence)}/5</td>
+                      <td className="p-3 align-top">{result.status.label}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="print-break-inside-avoid rounded-2xl border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold">Noter pr. initiativ</h2>
+          <div className="mt-3 space-y-3">
+            {assessmentResults.map((result, index) => (
+              <article key={result.assessment.id} className="rounded-xl bg-slate-50 p-4 text-sm ring-1 ring-slate-200">
+                <div className="font-semibold">{index + 1}. {result.assessment.initiativeName || "Ikke navngivet initiativ"}</div>
+                <div className="mt-2 whitespace-pre-wrap text-slate-700">{result.assessment.overallNotes?.trim() || "Ingen noter tilføjet."}</div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold">Faktorkommentarer og drøftelser</h2>
+          <p className="mt-1 text-sm text-slate-600">Kommentarerne under de enkelte faktorer er medtaget, fordi de dokumenterer vurderingens antagelser, diskussioner og databehov.</p>
+          <div className="mt-4 space-y-4">
+            {assessmentResults.map((result, index) => {
+              const commentRows = getFactorCommentRowsForAssessmentResult(result);
+              return (
+                <article key={result.assessment.id} className="print-break-inside-avoid rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                  <div className="mb-3 flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <div className="font-semibold">{index + 1}. {result.assessment.initiativeName || "Ikke navngivet initiativ"}</div>
+                      <div className="text-xs text-slate-500">{result.company.name} · {result.directType.name}</div>
+                    </div>
+                    <Badge>{commentRows.length} kommentar{commentRows.length === 1 ? "" : "er"}</Badge>
+                  </div>
+                  {commentRows.length === 0 ? (
+                    <div className="rounded-xl bg-white p-3 text-sm text-slate-500 ring-1 ring-slate-200">Ingen faktorkommentarer tilføjet.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {commentRows.map((row) => (
+                        <div key={row.factor.id} className="rounded-xl bg-white p-3 text-sm ring-1 ring-slate-200">
+                          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                            <div>
+                              <div className="font-semibold">{row.factor.name}</div>
+                              <div className="mt-1 text-xs text-slate-500">{row.factor.dim} · Score {scoreIntervalText(row.score)} · Datagrundlag {row.score.confidence}/5</div>
+                            </div>
+                            <Badge tone={row.factor.dim === "Værdi" ? "dark" : "blue"}>{row.factor.dim}</Badge>
+                          </div>
+                          <div className="mt-2 whitespace-pre-wrap rounded-xl bg-amber-50 p-3 text-slate-800 ring-1 ring-amber-200">{row.comment}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <footer className="print-break-inside-avoid rounded-2xl border border-slate-200 p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <BrandingLogo className="h-20 w-auto print:h-16" />
+              <BrandingContactBlock />
+            </div>
+            <div className="max-w-xl text-xs leading-relaxed text-slate-500 md:text-right">
+              <p>{BRANDING.output.decisionSupportNote}</p>
+              <p className="mt-2">{BRANDING.output.confidentialityNote}</p>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
 function PrintReport({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyleLabel, factorCounts, valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh, confidence, status, roiProxy, factorReportRows, criticalUnscoredRows, overallNotes, onClose }) {
   const scoredRows = factorReportRows.filter((row) => row.score.touched);
   const unscoredRowsWithComments = factorReportRows.filter((row) => !row.score.touched && factorCommentText(row));
@@ -1414,6 +1589,7 @@ export default function BuviScoringPrototype() {
   const [exportStatus, setExportStatus] = useState("");
   const [shareStatus, setShareStatus] = useState("");
   const [showPrintReport, setShowPrintReport] = useState(false);
+  const [showPortfolioPrintReport, setShowPortfolioPrintReport] = useState(false);
   const [resetCounter, setResetCounter] = useState(0);
 
   const activeAssessment = assessments.find((assessment) => assessment.id === activeAssessmentId) || assessments[0] || createAssessment();
@@ -1574,7 +1750,14 @@ export default function BuviScoringPrototype() {
           onClose={() => setShowPrintReport(false)}
         />
       )}
-    <div className={`min-h-screen bg-slate-50 p-6 text-slate-900 ${showPrintReport ? "no-print" : ""}`}>
+      {showPortfolioPrintReport && (
+        <PortfolioPrintReport
+          assessmentResults={assessmentResults}
+          activeAssessmentId={activeAssessmentId}
+          onClose={() => setShowPortfolioPrintReport(false)}
+        />
+      )}
+    <div className={`min-h-screen bg-slate-50 p-6 text-slate-900 ${showPrintReport || showPortfolioPrintReport ? "no-print" : ""}`}>
       <div className="mx-auto max-w-7xl space-y-6">
         <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex flex-col gap-4 md:flex-row md:items-start">
@@ -1901,9 +2084,10 @@ export default function BuviScoringPrototype() {
                       <div className="text-sm font-semibold">Samlet initiativliste</div>
                       <div className="mt-1 text-xs text-slate-500">Eksportér eller kopiér hele porteføljen med alle lokale initiativer.</div>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                    <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
                       <button type="button" onClick={() => { const ok = downloadJsonFile(portfolioExportPayload, "buvi-samlet-initiativliste"); setExportStatus(ok ? "Samlet initiativliste eksporteret" : "Portfolio-eksport fejlede"); }} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Eksportér samlet JSON</button>
                       <button type="button" onClick={async () => { const ok = await copyTextToClipboard(portfolioSummary); setExportStatus(ok ? "Samlet initiativliste kopieret" : "Kunne ikke kopiere samlet liste"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér samlet liste</button>
+                      <button type="button" onClick={() => { setShowPortfolioPrintReport(true); setExportStatus("Portefølje print-/PDF-visning åbnet"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Åbn portefølje-PDF</button>
                     </div>
                   </div>
 
