@@ -35,7 +35,7 @@ const BRANDING = {
   tool: {
     name: "BUVI/OxF scoringsværktøj",
     subtitle: "Konfigurerbart workshopværktøj til vurdering af bæredygtighedsinitiativer",
-    version: "v0.3.8-onboarding-clarity",
+    version: "v0.3.9-start-links",
     context: "Udviklet til workshopbrug i BUVI bæredygtighedsnetværket",
   },
   output: {
@@ -765,7 +765,7 @@ function buildWorkshopSummary({ company, directType, maturityOption, initiativeN
 function buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyle, factorCounts, factors, scores, anchorConfigBank, result, overallNotes }) {
   return {
     schemaVersion: "buvi-scoretool-export-v0.2",
-    appVersion: "v0.3.8-onboarding-clarity",
+    appVersion: "v0.3.9-start-links",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     anchorConfigBank,
@@ -811,7 +811,7 @@ function buildExportPayload({ company, directType, maturityOption, initiativeNam
 function buildPortfolioExportPayload({ assessments, assessmentResults, anchorConfigBank }) {
   return {
     schemaVersion: "buvi-scoretool-portfolio-export-v0.1",
-    appVersion: "v0.3.8-onboarding-clarity",
+    appVersion: "v0.3.9-start-links",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     exportedAt: new Date().toISOString(),
@@ -1063,27 +1063,31 @@ function SectionHeader({ label, title, theme, children }) {
 
 function StartHereGuide() {
   const steps = [
-    "Opret eller vælg initiativ",
-    "Vælg virksomhed, type og vurderingsniveau",
-    "Tilpas kun scoreforklaringer, hvis standarden ikke passer",
-    "Score det aktive initiativ og skriv korte kommentarer",
-    "Sammenlign initiativer og lav PDF til opsamling",
+    { label: "0", title: "Initiativer", text: "Opret, vælg eller duplikér initiativ", target: "section-initiatives" },
+    { label: "1", title: "Konfiguration", text: "Vælg virksomhed, type og vurderingsniveau", target: "section-configuration" },
+    { label: "2", title: "Standardforklaring", text: "Vælg standard, hvis faktorer ikke tilpasses", target: "section-standard-logic" },
+    { label: "3", title: "Scoreforklaring", text: "Tilpas hvad score 0, 3, 6, 9 og 12 betyder", target: "section-factor-descriptions" },
+    { label: "4", title: "Scoring", text: "Score det aktive initiativ og skriv kommentarer", target: "section-scoring" },
+    { label: "5", title: "Resultat og eksport", text: "Se resultat, matrix og lav PDF/opsamling", target: "section-result" },
+    { label: "6", title: "Gates", text: "Notér samlet beslutning og næste skridt", target: "section-gates" },
   ];
   return (
     <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/40">
       <CardContent className="p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2"><SectionIcon label="▶" theme={SECTION_THEMES.scoring} /><h2 className="text-lg font-semibold">Start her</h2></div>
-            <p className="max-w-4xl text-sm text-slate-700">Brug værktøjet som beslutningsstøtte i workshoppen. Scoren er kun halvdelen af outputtet; kommentarer, antagelser og databehov er lige så vigtige.</p>
-            <div className="mt-4 grid gap-2 md:grid-cols-5">
-              {steps.map((step, index) => <div key={step} className="rounded-xl bg-white p-3 text-xs leading-relaxed ring-1 ring-emerald-200"><div className="mb-1 font-semibold text-emerald-900">{index + 1}. trin</div><div className="text-slate-700">{step}</div></div>)}
-            </div>
-          </div>
-          <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col">
-            <button type="button" onClick={() => scrollToSection("section-scoring")} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Gå til scoring</button>
-            <button type="button" onClick={() => scrollToSection("section-factor-descriptions")} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Se scoreforklaringer</button>
-          </div>
+        <div className="mb-4 flex items-center gap-2"><SectionIcon label="▶" theme={SECTION_THEMES.scoring} /><h2 className="text-lg font-semibold">Start her</h2></div>
+        <p className="max-w-4xl text-sm text-slate-700">Brug værktøjet som beslutningsstøtte i workshoppen. Scoren er kun halvdelen af outputtet; kommentarer, antagelser og databehov er lige så vigtige.</p>
+        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-7">
+          {steps.map((step) => (
+            <button
+              key={step.target}
+              type="button"
+              onClick={() => scrollToSection(step.target)}
+              className="rounded-xl bg-white p-3 text-left text-xs leading-relaxed ring-1 ring-emerald-200 transition hover:-translate-y-0.5 hover:bg-emerald-50 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            >
+              <div className="mb-1 flex items-center gap-2 font-semibold text-emerald-900"><span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[10px] ring-1 ring-emerald-200">{step.label}</span>{step.title}</div>
+              <div className="text-slate-700">{step.text}</div>
+            </button>
+          ))}
         </div>
       </CardContent>
     </Card>
@@ -1860,7 +1864,7 @@ export default function BuviScoringPrototype() {
 
         <ShareLinkQrBlock onCopy={copyShareLink} status={shareStatus} />
 
-        <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/30">
+        <Card id="section-initiatives" className="border-l-4 border-l-emerald-500 bg-emerald-50/30">
           <CardContent className="p-5">
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <SectionHeader label="0" title="Initiativer" theme={SECTION_THEMES.scoring}>
@@ -1886,7 +1890,7 @@ export default function BuviScoringPrototype() {
         </Card>
 
         <div className="grid gap-4 lg:grid-cols-4">
-          <Card className={`lg:col-span-3 ${SECTION_THEMES.configuration.card}`}>
+          <Card id="section-configuration" className={`lg:col-span-3 ${SECTION_THEMES.configuration.card}`}>
             <CardContent className="p-5">
               <SectionHeader label="1" title="Konfiguration" theme={SECTION_THEMES.configuration} />
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -1920,7 +1924,7 @@ export default function BuviScoringPrototype() {
           </Card>
         </div>
 
-        <Card className={SECTION_THEMES.standardLogic.card}>
+        <Card id="section-standard-logic" className={SECTION_THEMES.standardLogic.card}>
           <CardContent className="p-5">
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
@@ -2122,7 +2126,7 @@ export default function BuviScoringPrototype() {
           </Card>
 
           <div className="space-y-4">
-            <Card className={SECTION_THEMES.result.card}>
+            <Card id="section-result" className={SECTION_THEMES.result.card}>
               <CardContent className="p-5">
                 <div className="mb-3 flex items-center gap-2"><SectionIcon label="5" theme={SECTION_THEMES.result} /><h2 className="text-lg font-semibold">Resultat</h2></div>
                 <div className="space-y-3">
@@ -2143,7 +2147,7 @@ export default function BuviScoringPrototype() {
               </CardContent>
             </Card>
 
-            <Card className={SECTION_THEMES.result.card}>
+            <Card id="section-export" className={SECTION_THEMES.result.card}>
               <CardContent className="p-5">
                 <div className="mb-4 flex items-center gap-2"><SectionIcon label="E" theme={SECTION_THEMES.result} /><h2 className="text-lg font-semibold">Deling og eksport</h2></div>
                 <div className="space-y-4">
@@ -2176,7 +2180,7 @@ export default function BuviScoringPrototype() {
               </CardContent>
             </Card>
 
-            <Card className={SECTION_THEMES.result.card}>
+            <Card id="section-matrix" className={SECTION_THEMES.result.card}>
               <CardContent className="p-5">
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
@@ -2210,7 +2214,7 @@ export default function BuviScoringPrototype() {
               </CardContent>
             </Card>
 
-            <Card className={SECTION_THEMES.gates.card}>
+            <Card id="section-gates" className={SECTION_THEMES.gates.card}>
               <CardContent className="p-5">
                 <div className="mb-3 flex items-center gap-2"><SectionIcon label="6" theme={SECTION_THEMES.gates} /><h2 className="text-lg font-semibold">Gates og næste skridt</h2></div>
                 <div className="space-y-2 text-sm">
