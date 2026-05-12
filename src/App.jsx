@@ -35,7 +35,7 @@ const BRANDING = {
   tool: {
     name: "BUVI/OxF scoringsværktøj",
     subtitle: "Konfigurerbart workshopværktøj til vurdering af bæredygtighedsinitiativer",
-    version: "v0.2.15-grouped-scoring-factors",
+    version: "v0.2.16-ui-cleanup",
     context: "Udviklet til workshopbrug i BUVI bæredygtighedsnetværket",
   },
   output: {
@@ -674,7 +674,7 @@ function buildWorkshopSummary({ company, directType, maturityOption, initiativeN
 function buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyle, factorCounts, factors, scores, anchorConfigBank, result, overallNotes }) {
   return {
     schemaVersion: "buvi-scoretool-export-v0.2",
-    appVersion: "v0.2.15-grouped-scoring-factors",
+    appVersion: "v0.2.16-ui-cleanup",
     branding: BRANDING,
     shareLink: SHARE_LINK,
     anchorConfigBank,
@@ -799,6 +799,7 @@ function runPrototypeTests() {
   console.assert(SECTION_THEMES.configuration.card.includes("sky"), "configuration section has its own color theme");
   console.assert(SECTION_THEMES.factorDescriptions.card.includes("amber"), "factor description section has its own color theme");
   console.assert(SECTION_THEMES.scoring.card.includes("emerald"), "initiative scoring section has its own color theme");
+  console.assert(BRANDING.tool.version.includes("ui-cleanup"), "version label reflects UI cleanup work");
   console.assert(SHARE_LINK.shortUrl.includes("probalance.dk/buvi"), "share link has a presentation-friendly short URL");
   console.assert(getQrCodeUrl(SHARE_LINK.canonicalUrl).includes("data="), "QR code URL is generated for the public tool link");
   console.assert(getQrCodeUrl(SHARE_LINK.canonicalUrl).includes("api.qrserver.com"), "QR code URL uses the configured QR generator");
@@ -864,15 +865,12 @@ function SectionIcon({ label, theme }) {
 
 function SectionHeader({ label, title, theme, children }) {
   return (
-    <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-      <div>
-        <div className="flex items-center gap-2">
-          <SectionIcon label={label} theme={theme} />
-          <h2 className="text-lg font-semibold">{title}</h2>
-          {theme?.label && <span className={`hidden rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 md:inline-flex ${theme.soft}`}>{theme.label}</span>}
-        </div>
-        {children && <div className="mt-2 text-sm text-slate-600">{children}</div>}
+    <div className="mb-4">
+      <div className="flex items-center gap-2">
+        <SectionIcon label={label} theme={theme} />
+        <h2 className="text-lg font-semibold">{title}</h2>
       </div>
+      {children && <div className="mt-2 text-sm text-slate-600">{children}</div>}
     </div>
   );
 }
@@ -976,13 +974,13 @@ function CenterConfigEditor({ factor, config, anchorStyle, currentCenterStatemen
     <div className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Fælles faktorbeskrivelse</div>
-          <div className="text-xs text-slate-500">Denne scorelogik gemmes fælles pr. faktor og bruges på tværs af alle initiativer, hvor faktoren indgår. Scores, kommentarer og datagrundlag er stadig specifikke for det enkelte initiativ.</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Faktorbeskrivelse</div>
+          <div className="text-xs text-slate-500">Fælles scorelogik for denne faktor.</div>
         </div>
         <Badge tone={isNumber ? "green" : "amber"}>{isNumber ? "Talgrænse" : "Kvalitativ"}</Badge>
       </div>
       <div className="mb-3 rounded-xl bg-white p-3 ring-1 ring-slate-200">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Beskrivelseslogik for denne faktor</div>
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Beskrivelseslogik</div>
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
           {anchorStyleOptions.map((option) => (
             <button
@@ -1019,8 +1017,7 @@ function CenterConfigEditor({ factor, config, anchorStyle, currentCenterStatemen
         </label>
       )}
       <div className="mt-3 rounded-xl bg-white p-3 text-xs leading-relaxed text-slate-700 ring-1 ring-slate-200">
-        <span className="font-semibold">Aktuel fælles score 6-sætning ({anchorStyleOptions.find((item) => item.id === anchorStyle)?.name || "valgt logik"}): </span>
-        {currentCenterStatement}
+        <span className="font-semibold">Score 6:</span> {currentCenterStatement}
       </div>
     </div>
   );
@@ -1382,28 +1379,21 @@ export default function BuviScoringPrototype() {
         <div className="grid gap-4 lg:grid-cols-4">
           <Card className={`lg:col-span-3 ${SECTION_THEMES.configuration.card}`}>
             <CardContent className="p-5">
-              <SectionHeader label="1" title="1. Konfiguration" theme={SECTION_THEMES.configuration} />
+              <SectionHeader label="1" title="Konfiguration" theme={SECTION_THEMES.configuration} />
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <SelectField label="Virksomhed" value={companyId} onChange={setCompanyId} options={companies} hint={company.label} />
                 <SelectField label="Initiativtype" value={initiativeType} onChange={setInitiativeType} options={initiativeTypes} hint={directType.hint} />
                 <SelectField label="Beslutningsniveau" value={maturity} onChange={setMaturity} options={maturityOptions} hint={maturityOption.hint} />
                 <div className="space-y-2">
-                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Initiativ</label>
+                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Initiativtitel</label>
                   <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2" value={initiativeName} onChange={(event) => setInitiativeName(event.target.value)} />
-                  <p className="text-xs text-slate-500">Bruges som casebeskrivelse i workshoppen.</p>
+                  <p className="text-xs text-slate-500">Bruges i resultat, eksport og print.</p>
                 </div>
               </div>
-              <div className="mt-4 grid gap-4 lg:grid-cols-[2fr_1fr]">
-                <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Aktivt initiativ</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">{initiativeName || "Ikke navngivet endnu"}</div>
-                  <p className="mt-1 text-xs text-slate-500">Denne titel følger med i resultatet og skal senere bruges, når flere initiativer sammenlignes.</p>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Link til initiativbeskrivelse</label>
-                  <input type="url" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2" placeholder="https://..." value={initiativeLink} onChange={(event) => setInitiativeLink(event.target.value)} />
-                  <div className="text-xs text-slate-500">{normalizedInitiativeLink ? <a className="font-medium text-sky-700 underline decoration-sky-300 underline-offset-2" href={normalizedInitiativeLink} target="_blank" rel="noreferrer">Åbn initiativbeskrivelse</a> : "Indsæt fx link til PowerPoint, PDF, SharePoint eller OneDrive."}</div>
-                </div>
+              <div className="mt-4 space-y-2">
+                <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Link til initiativbeskrivelse</label>
+                <input type="url" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2" placeholder="https://..." value={initiativeLink} onChange={(event) => setInitiativeLink(event.target.value)} />
+                <div className="text-xs text-slate-500">{normalizedInitiativeLink ? <a className="font-medium text-sky-700 underline decoration-sky-300 underline-offset-2" href={normalizedInitiativeLink} target="_blank" rel="noreferrer">Åbn initiativbeskrivelse</a> : "Indsæt fx link til PowerPoint, PDF, SharePoint eller OneDrive."}</div>
               </div>
             </CardContent>
           </Card>
@@ -1425,11 +1415,10 @@ export default function BuviScoringPrototype() {
           <CardContent className="p-5">
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <SectionHeader label="2" title="2. Standardlogik for nye faktorbeskrivelser" theme={SECTION_THEMES.standardLogic}>
-                  <p className="max-w-3xl">Her vælger du kun standardlogikken. Den bruges som fallback for faktorer, der ikke har fået egen beskrivelseslogik endnu. Den konkrete logik vælges nu pr. faktor i sektion 3.</p>
+                <SectionHeader label="2" title="Standardlogik for nye faktorbeskrivelser" theme={SECTION_THEMES.standardLogic}>
+                  <p className="max-w-3xl">Bruges som fallback for faktorer uden egen beskrivelseslogik. De konkrete valg styres pr. faktor i sektion 3.</p>
                 </SectionHeader>
               </div>
-              <div className={`rounded-2xl p-4 text-sm text-slate-700 ring-1 lg:max-w-md ${SECTION_THEMES.standardLogic.soft}`}><span className="font-semibold">Bemærk:</span> Beskrivelseslogik kan nu vælges pr. faktor under “Fælles faktorbeskrivelser”. Det gør det muligt at bruge fx absolutte scoregrænser på CO2 og dokumentationssprog på greenwashing.</div>
             </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {anchorStyleOptions.map((option) => (
@@ -1439,7 +1428,6 @@ export default function BuviScoringPrototype() {
                 </button>
               ))}
             </div>
-            <div className="mt-4 rounded-2xl bg-slate-100 p-4 text-sm text-slate-700"><span className="font-semibold">Standardlogik:</span> {activeAnchorStyle.name}. <span className="text-slate-500">Individuelle faktorvalg i sektion 3 har forrang over denne standard.</span></div>
           </CardContent>
         </Card>
 
@@ -1447,11 +1435,10 @@ export default function BuviScoringPrototype() {
           <CardContent className="p-5">
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <SectionHeader label="3" title="3. Fælles faktorbeskrivelser" theme={SECTION_THEMES.factorDescriptions}>
-                  <p className="max-w-4xl">Her redigeres den fælles scoreforståelse pr. faktor. Ændringer gemmes i anchorConfigBank og bruges på tværs af alle initiativer, hvor faktoren indgår. Den konkrete scoring, kommentarer og datagrundlag ligger i næste sektion og er specifikke for det aktive initiativ.</p>
+                <SectionHeader label="3" title="Fælles faktorbeskrivelser" theme={SECTION_THEMES.factorDescriptions}>
+                  <p className="max-w-4xl">Redigér fælles scoreforståelse pr. faktor. Den konkrete scoring, kommentarer og datagrundlag ligger i næste sektion.</p>
                 </SectionHeader>
               </div>
-              <div className={`rounded-2xl p-4 text-sm text-slate-700 ring-1 lg:max-w-md ${SECTION_THEMES.factorDescriptions.soft}`}><span className="font-semibold">Arkitekturregel:</span> Fælles faktorbeskrivelser skriver til anchorConfigBank. Initiativscoring skriver til den aktive vurdering.</div>
             </div>
             <div className="grid gap-4 xl:grid-cols-2">
               {[
@@ -1478,7 +1465,7 @@ export default function BuviScoringPrototype() {
                               <div className="flex flex-wrap items-center gap-2"><Badge tone={group.tone}>{factor.dim}</Badge><h4 className="font-semibold">{factor.name}</h4><Badge>{anchorStyleOptions.find((item) => item.id === factorAnchorStyle)?.name || factorAnchorStyle}</Badge></div>
                               <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">{factor.tags.slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
                             </div>
-                            <Badge tone="blue">Fælles pr. faktor</Badge>
+                            
                           </div>
                           <details className="rounded-2xl bg-slate-50 p-3 text-sm ring-1 ring-slate-200">
                             <summary className="cursor-pointer font-semibold text-slate-700">Rediger fælles faktorbeskrivelse</summary>
@@ -1511,13 +1498,8 @@ export default function BuviScoringPrototype() {
           <Card className={`xl:col-span-2 ${SECTION_THEMES.scoring.card}`}>
             <CardContent className="p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2"><SectionIcon label="4" theme={SECTION_THEMES.scoring} /><h2 className="text-lg font-semibold">4. Initiativscoring</h2><span className={`hidden rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 md:inline-flex ${SECTION_THEMES.scoring.soft}`}>{SECTION_THEMES.scoring.label}</span></div>
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => { const ok = downloadJsonFile(exportPayload, initiativeName || "buvi-vurdering"); setExportStatus(ok ? "JSON-eksport er hentet" : "JSON-eksport fejlede"); }} className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white shadow-sm hover:bg-slate-800">Eksportér JSON</button>
-                  <button type="button" onClick={async () => { const ok = await copyTextToClipboard(workshopSummary); setExportStatus(ok ? "Opsummering kopieret" : "Kunne ikke kopiere automatisk"); }} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér opsummering</button>
-                  <button type="button" onClick={() => setShowPrintReport(true)} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Åbn printvisning</button>
-                  <Badge>Scoring for aktivt initiativ</Badge>
-                </div>
+                <div className="flex items-center gap-2"><SectionIcon label="4" theme={SECTION_THEMES.scoring} /><h2 className="text-lg font-semibold">Initiativscoring</h2></div>
+                <Badge tone="green">Scoring for aktivt initiativ</Badge>
               </div>
 
               <div className="space-y-6">
@@ -1575,10 +1557,6 @@ export default function BuviScoringPrototype() {
                                 <div className="rounded-xl bg-emerald-50 p-2 ring-1 ring-emerald-200"><div className="text-slate-500">Høj</div><div className="text-lg font-semibold text-emerald-900">{displayRawScore(score.high)}</div></div>
                               </div>
                             </div>
-                            <div className={`mt-3 rounded-2xl p-3 text-xs leading-relaxed ring-1 ${group.key === "value" ? "bg-slate-50 text-slate-600 ring-slate-200" : "bg-sky-50 text-sky-700 ring-sky-200"}`}>
-                              Anchor statements herunder kommer fra den fælles faktorbeskrivelse i sektion 3. Klik for at score det aktive initiativ; score, datagrundlag og kommentar gælder kun dette initiativ.
-                            </div>
-
                             <div className="mt-4 grid gap-3 md:grid-cols-5">
                               {SCORE_LEVELS.map((level) => <ScoreAnchorButton key={level} level={level} text={anchors[level]} selectedLow={score.touched && score.low === level} selectedHigh={score.touched && score.high === level} onClick={() => setScore(factor.id, "anchor", level)} />)}
                             </div>
@@ -1604,28 +1582,12 @@ export default function BuviScoringPrototype() {
           <div className="space-y-4">
             <Card className={SECTION_THEMES.result.card}>
               <CardContent className="p-5">
-                <div className="mb-3 flex items-center gap-2"><SectionIcon label="5" theme={SECTION_THEMES.result} /><h2 className="text-lg font-semibold">5. Resultat</h2></div>
+                <div className="mb-3 flex items-center gap-2"><SectionIcon label="5" theme={SECTION_THEMES.result} /><h2 className="text-lg font-semibold">Resultat</h2></div>
                 <div className="space-y-3">
-                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <div><div className="text-xs uppercase tracking-wide text-slate-500">Deling</div><div className="text-sm font-medium text-slate-800">Eksportér eller kopiér vurderingen</div></div>
-                      {exportStatus && <Badge tone={exportStatus.includes("fejlede") || exportStatus.includes("ikke") ? "amber" : "green"}>{exportStatus}</Badge>}
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-3">
-                      <button type="button" onClick={() => { const ok = downloadJsonFile(exportPayload, initiativeName || "buvi-vurdering"); setExportStatus(ok ? "JSON-eksport er hentet" : "JSON-eksport fejlede"); }} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800">Eksportér JSON</button>
-                      <button type="button" onClick={async () => { const ok = await copyTextToClipboard(workshopSummary); setExportStatus(ok ? "Opsummering kopieret" : "Kunne ikke kopiere automatisk"); }} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér opsummering</button>
-                      <button type="button" onClick={() => setShowPrintReport(true)} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Åbn printvisning</button>
-                    </div>
-                    <textarea className="mt-3 min-h-32 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700 outline-none ring-slate-300 focus:ring-2" value={workshopSummary} readOnly />
-                  </div>
-
                   <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
                     <div className="text-xs uppercase tracking-wide text-slate-500">Initiativ</div>
                     <div className="mt-1 font-medium">{initiativeName}</div>
-                    <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 ring-1 ring-slate-200">
-                      <div className="font-semibold text-slate-700">Initiativbeskrivelse</div>
-                      {normalizedInitiativeLink ? <a className="mt-1 inline-flex font-medium text-sky-700 underline decoration-sky-300 underline-offset-2" href={normalizedInitiativeLink} target="_blank" rel="noreferrer">Åbn initiativbeskrivelse</a> : <div className="mt-1">Ingen initiativbeskrivelse tilføjet.</div>}
-                    </div>
+                    {normalizedInitiativeLink && <a className="mt-2 inline-flex text-xs font-medium text-sky-700 underline decoration-sky-300 underline-offset-2" href={normalizedInitiativeLink} target="_blank" rel="noreferrer">Åbn initiativbeskrivelse</a>}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -1649,7 +1611,7 @@ export default function BuviScoringPrototype() {
 
             <Card className={SECTION_THEMES.gates.card}>
               <CardContent className="p-5">
-                <div className="mb-3 flex items-center gap-2"><SectionIcon label="6" theme={SECTION_THEMES.gates} /><h2 className="text-lg font-semibold">6. Gates og næste skridt</h2></div>
+                <div className="mb-3 flex items-center gap-2"><SectionIcon label="6" theme={SECTION_THEMES.gates} /><h2 className="text-lg font-semibold">Gates og næste skridt</h2></div>
                 <div className="space-y-2 text-sm">
                   {confidence < 3 && <div className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">Datagrundlaget er lavt: brug resultatet til dialog og databehov, ikke ekstern kommunikation.</div>}
                   {factors.some((factor) => factor.id === "greenwashing" && ((scores[factor.id] && bestScore(scores[factor.id])) || 12) < 6) && <div className="rounded-xl bg-rose-50 p-3 ring-1 ring-rose-200">Greenwashing-gate: grønne udsagn bør ikke publiceres før dokumentation og formulering er forbedret.</div>}
