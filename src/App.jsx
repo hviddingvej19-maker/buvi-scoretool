@@ -35,7 +35,7 @@ const BRANDING = {
   tool: {
     name: "BUVI/OxF scoringsværktøj",
     subtitle: "Konfigurerbart workshopværktøj til vurdering af bæredygtighedsinitiativer",
-    version: "v0.2.11-grouped-factor-descriptions",
+    version: "v0.2.14-section-color-coding",
     context: "Udviklet til workshopbrug i BUVI bæredygtighedsnetværket",
   },
   output: {
@@ -43,6 +43,60 @@ const BRANDING = {
     contactLabel: "Kontakt",
     confidentialityNote: "Vurderingen er et workshopbaseret beslutningsgrundlag. Data gemmes lokalt i brugerens browser og deles kun, hvis brugeren selv eksporterer eller kopierer indholdet.",
     decisionSupportNote: "Scoren er beslutningsstøtte og bør kvalificeres med dialog, datagrundlag og virksomhedens egne prioriteringer.",
+  },
+};
+
+const SHARE_LINK = {
+  canonicalUrl: "https://hviddingvej19-maker.github.io/buvi-scoretool/",
+  shortUrl: "https://probalance.dk/buvi",
+  displayShortUrl: "probalance.dk/buvi",
+  qrTargetUrl: "https://hviddingvej19-maker.github.io/buvi-scoretool/",
+  redirectStatus: "Planlagt redirect",
+  redirectNote: "Når redirectet på probalance.dk/buvi er aktivt, kan qrTargetUrl ændres til shortUrl, så QR-koden peger på den pæne adresse.",
+};
+
+const SECTION_THEMES = {
+  configuration: {
+    card: "border-l-4 border-l-sky-400 bg-sky-50/30",
+    soft: "bg-sky-50 ring-sky-200",
+    icon: "bg-sky-100 text-sky-800 ring-sky-200",
+    label: "Konfiguration",
+  },
+  engine: {
+    card: "border-l-4 border-l-slate-400 bg-slate-50/40",
+    soft: "bg-slate-100 ring-slate-200",
+    icon: "bg-slate-100 text-slate-800 ring-slate-200",
+    label: "Motor",
+  },
+  standardLogic: {
+    card: "border-l-4 border-l-violet-400 bg-violet-50/30",
+    soft: "bg-violet-50 ring-violet-200",
+    icon: "bg-violet-100 text-violet-800 ring-violet-200",
+    label: "Standardlogik",
+  },
+  factorDescriptions: {
+    card: "border-l-4 border-l-amber-400 bg-amber-50/30",
+    soft: "bg-amber-50 ring-amber-200",
+    icon: "bg-amber-100 text-amber-800 ring-amber-200",
+    label: "Fælles beskrivelser",
+  },
+  scoring: {
+    card: "border-l-4 border-l-emerald-400 bg-emerald-50/30",
+    soft: "bg-emerald-50 ring-emerald-200",
+    icon: "bg-emerald-100 text-emerald-800 ring-emerald-200",
+    label: "Initiativscoring",
+  },
+  result: {
+    card: "border-l-4 border-l-blue-400 bg-blue-50/30",
+    soft: "bg-blue-50 ring-blue-200",
+    icon: "bg-blue-100 text-blue-800 ring-blue-200",
+    label: "Resultat",
+  },
+  gates: {
+    card: "border-l-4 border-l-rose-400 bg-rose-50/30",
+    soft: "bg-rose-50 ring-rose-200",
+    icon: "bg-rose-100 text-rose-800 ring-rose-200",
+    label: "Gates",
   },
 };
 
@@ -318,6 +372,16 @@ function getAnchorConfigFromBank(anchorConfigBank, factor) {
   return { ...getDefaultCenterConfig(factor), ...(configsByFactorId[factor.id] || {}) };
 }
 
+function getFactorAnchorStyle(anchorConfigBank, factor, fallbackAnchorStyle = "general") {
+  const config = anchorConfigBank?.configsByFactorId?.[factor.id];
+  return config?.anchorStyle || fallbackAnchorStyle || "general";
+}
+
+function updateFactorAnchorStyle(anchorConfigBank, factorId, nextAnchorStyle) {
+  const existingConfig = anchorConfigBank?.configsByFactorId?.[factorId] || {};
+  return updateAnchorConfigBank(anchorConfigBank, factorId, { ...existingConfig, anchorStyle: nextAnchorStyle });
+}
+
 function updateAnchorConfigBank(anchorConfigBank, factorId, nextConfig) {
   return {
     version: anchorConfigBank?.version || 1,
@@ -419,7 +483,7 @@ function buildDocumentationAnchors(factor, config) {
   };
 }
 
-function buildAnchors(factor, config, anchorStyle) {
+function buildAnchors(factor, config, anchorStyle = "general") {
   if (anchorStyle === "relative") return buildRelativeAnchors(factor, config);
   if (anchorStyle === "documentation") return buildDocumentationAnchors(factor, config);
   if (anchorStyle === "general") return buildGeneralAnchors(factor, config);
@@ -511,6 +575,16 @@ function normalizeInitiativeLink(value) {
   return `https://${trimmed}`;
 }
 
+function getQrCodeUrl(value, size = 260) {
+  const params = new URLSearchParams({
+    size: `${size}x${size}`,
+    data: value,
+    margin: "12",
+    format: "png",
+  });
+  return `https://api.qrserver.com/v1/create-qr-code/?${params.toString()}`;
+}
+
 function makeSafeFileName(value) {
   return String(value || "buvi-vurdering")
     .toLowerCase()
@@ -597,11 +671,12 @@ function buildWorkshopSummary({ company, directType, maturityOption, initiativeN
   return lines.join("\n");
 }
 
-function buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, anchorStyle, factorCounts, factors, scores, anchorConfigBank, result, overallNotes }) {
+function buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyle, factorCounts, factors, scores, anchorConfigBank, result, overallNotes }) {
   return {
     schemaVersion: "buvi-scoretool-export-v0.2",
-    appVersion: "v0.2.11-grouped-factor-descriptions",
+    appVersion: "v0.2.14-section-color-coding",
     branding: BRANDING,
+    shareLink: SHARE_LINK,
     anchorConfigBank,
     exportedAt: new Date().toISOString(),
     assessment: {
@@ -614,13 +689,14 @@ function buildExportPayload({ company, directType, maturityOption, initiativeNam
       maturityName: maturityOption.name,
       initiativeName,
       initiativeLink: normalizeInitiativeLink(initiativeLink),
-      anchorStyle,
+      defaultAnchorStyle,
       factorBalance: factorCounts,
     },
     result,
     factors: factors.map((factor) => {
       const centerConfig = getAnchorConfigFromBank(anchorConfigBank, factor);
-      const anchors = buildAnchors(factor, centerConfig, anchorStyle);
+      const factorAnchorStyle = getFactorAnchorStyle(anchorConfigBank, factor, defaultAnchorStyle);
+      const anchors = buildAnchors(factor, centerConfig, factorAnchorStyle);
       const score = normalizeScoreRange(scores[factor.id] || { low: null, high: null, confidence: 2, assumption: "", touched: false });
       return {
         id: factor.id,
@@ -630,6 +706,8 @@ function buildExportPayload({ company, directType, maturityOption, initiativeNam
         tags: factor.tags,
         score,
         centerConfig: anchorConfigBank?.configsByFactorId?.[factor.id] || null,
+        anchorStyle: factorAnchorStyle,
+        anchorStyleName: anchorStyleOptions.find((item) => item.id === factorAnchorStyle)?.name || factorAnchorStyle,
         anchors,
         selectedAnchors: getSelectedAnchors(score, anchors),
         isCriticalUnscored: !score.touched && isCriticalUnscoredFactor(factor),
@@ -718,9 +796,18 @@ function runPrototypeTests() {
   console.assert(BRANDING.facilitator.email === "christian@probalance.dk", "branding includes facilitator email");
   console.assert(BRANDING.facilitator.linkedin.startsWith("https://"), "branding LinkedIn URL is normalized");
   console.assert(!BRANDING.organization.logo.src.startsWith("/"), "branding logo uses a relative public path so GitHub Pages base paths work");
+  console.assert(SECTION_THEMES.configuration.card.includes("sky"), "configuration section has its own color theme");
+  console.assert(SECTION_THEMES.factorDescriptions.card.includes("amber"), "factor description section has its own color theme");
+  console.assert(SECTION_THEMES.scoring.card.includes("emerald"), "initiative scoring section has its own color theme");
+  console.assert(SHARE_LINK.shortUrl.includes("probalance.dk/buvi"), "share link has a presentation-friendly short URL");
+  console.assert(getQrCodeUrl(SHARE_LINK.canonicalUrl).includes("data="), "QR code URL is generated for the public tool link");
+  console.assert(getQrCodeUrl(SHARE_LINK.canonicalUrl).includes("api.qrserver.com"), "QR code URL uses the configured QR generator");
   const testAnchorBank = createAnchorConfigBank({ co2: { kind: "number", centerValue: 42, unit: "tons", direction: "higherBetter" } });
   console.assert(getAnchorConfigFromBank(testAnchorBank, coreFactors[0]).centerValue === 42, "anchor config bank overrides default factor center config");
   console.assert(updateAnchorConfigBank(testAnchorBank, "data", { kind: "text", centerText: "Test", direction: "higherBetter" }).configsByFactorId.data.centerText === "Test", "anchor config bank can update a factor config");
+  console.assert(getFactorAnchorStyle(createAnchorConfigBank({ co2: { anchorStyle: "documentation" } }), coreFactors[0], "absolute") === "documentation", "factor-level anchor style overrides default style");
+  console.assert(getFactorAnchorStyle(createAnchorConfigBank(), coreFactors[0], "relative") === "relative", "factor-level anchor style falls back to default style");
+  console.assert(updateFactorAnchorStyle(createAnchorConfigBank(), "co2", "general").configsByFactorId.co2.anchorStyle === "general", "factor-level anchor style can be updated in anchorConfigBank");
   console.assert(makeSafeFileName("Æ Ø Å test!") === "ae-oe-aa-test", "safe file names normalize Danish characters");
   console.assert(buildWorkshopSummary({ company: companies[0], directType: initiativeTypes[0], maturityOption: maturityOptions[0], initiativeName: "Test", initiativeLink: "example.com", valueBest: 6, feasibilityBest: 9, valueLow: 3, valueHigh: 9, feasibilityLow: 9, feasibilityHigh: 9, confidence: 3, status: { label: "Teststatus" }, roiProxy: 54, factorCounts: { value: 4, feasibility: 4 }, overallNotes: "Næste skridt" }).includes("https://example.com"), "workshop summary includes normalized initiative link");
   console.assert(buildWorkshopSummary({ company: companies[0], directType: initiativeTypes[0], maturityOption: maturityOptions[0], initiativeName: "Test", initiativeLink: "", valueBest: null, feasibilityBest: null, valueLow: null, valueHigh: null, feasibilityLow: null, feasibilityHigh: null, confidence: 2, status: { label: "Ikke scoret" }, roiProxy: null, factorCounts: { value: 4, feasibility: 4 }, overallNotes: "" }).split("\n").length >= 9, "workshop summary is newline separated and handles empty scores");
@@ -771,6 +858,25 @@ function Icon({ label }) {
   return <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">{label}</span>;
 }
 
+function SectionIcon({ label, theme }) {
+  return <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ring-1 ${theme?.icon || SECTION_THEMES.engine.icon}`}>{label}</span>;
+}
+
+function SectionHeader({ label, title, theme, children }) {
+  return (
+    <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+      <div>
+        <div className="flex items-center gap-2">
+          <SectionIcon label={label} theme={theme} />
+          <h2 className="text-lg font-semibold">{title}</h2>
+          {theme?.label && <span className={`hidden rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 md:inline-flex ${theme.soft}`}>{theme.label}</span>}
+        </div>
+        {children && <div className="mt-2 text-sm text-slate-600">{children}</div>}
+      </div>
+    </div>
+  );
+}
+
 function BrandingLogo({ className = "h-10 w-auto", showFallback = true }) {
   return (
     <div className="flex items-center gap-3">
@@ -805,6 +911,31 @@ function BrandingContactBlock({ compact = false, className = "" }) {
   );
 }
 
+function ShareLinkQrBlock({ compact = false, onCopy, status = "" }) {
+  return (
+    <div className={`rounded-2xl bg-white p-4 ring-1 ring-slate-200 ${compact ? "" : "shadow-sm"}`}>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Del værktøjet</div>
+          <div className="mt-1 text-lg font-semibold text-slate-900">{SHARE_LINK.displayShortUrl}</div>
+          <p className="mt-1 max-w-2xl text-sm text-slate-600">Brug den pæne adresse i præsentationen, når redirectet er sat op. QR-koden peger lige nu på den aktive GitHub Pages-version, så den virker med det samme.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <a className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white shadow-sm hover:bg-slate-800" href={SHARE_LINK.qrTargetUrl} target="_blank" rel="noreferrer">Åbn værktøj</a>
+            <button type="button" onClick={() => onCopy?.(SHARE_LINK.qrTargetUrl)} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér aktivt link</button>
+            <Badge tone="amber">{SHARE_LINK.redirectStatus}</Badge>
+            {status && <Badge tone={status.includes("kopieret") ? "green" : "amber"}>{status}</Badge>}
+          </div>
+          {!compact && <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-600 ring-1 ring-slate-200">{SHARE_LINK.redirectNote}</div>}
+        </div>
+        <div className="flex shrink-0 flex-col items-center gap-2 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+          <img src={getQrCodeUrl(SHARE_LINK.qrTargetUrl, compact ? 180 : 220)} alt={`QR-kode til ${SHARE_LINK.qrTargetUrl}`} className={`${compact ? "h-40 w-40" : "h-52 w-52"} rounded-xl bg-white p-2 ring-1 ring-slate-200`} />
+          <div className="max-w-52 break-all text-center text-[11px] text-slate-500">{SHARE_LINK.qrTargetUrl}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SelectField({ label, value, onChange, options, hint }) {
   return (
     <div className="space-y-2">
@@ -820,7 +951,11 @@ function SelectField({ label, value, onChange, options, hint }) {
 function ScoreAnchorButton({ level, text, selectedLow, selectedHigh, onClick }) {
   const selected = selectedLow || selectedHigh;
   return (
-    <button type="button" onClick={onClick} className={`group flex min-h-32 flex-col rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${selected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white hover:border-slate-400"}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group flex min-h-32 flex-col rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${selected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white hover:border-slate-400"}`}
+    >
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className={`text-2xl font-semibold ${selected ? "text-white" : "text-slate-900"}`}>{level}</span>
         <span className="flex gap-1">
@@ -834,17 +969,33 @@ function ScoreAnchorButton({ level, text, selectedLow, selectedHigh, onClick }) 
   );
 }
 
-function CenterConfigEditor({ factor, config, anchorStyle, currentCenterStatement, onChange }) {
+function CenterConfigEditor({ factor, config, anchorStyle, currentCenterStatement, onChange, onAnchorStyleChange }) {
   const isNumber = config.kind === "number";
   const showAbsoluteCalibration = isNumber && anchorStyle === "absolute";
   return (
     <div className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
-      <div className="mb-2 flex items-center justify-between gap-2">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Fælles faktorbeskrivelse</div>
-          <div className="text-xs text-slate-500">Denne score 6-beskrivelse gemmes fælles pr. faktor og bruges på tværs af alle initiativer, hvor faktoren indgår. Scores, kommentarer og datagrundlag er stadig specifikke for det enkelte initiativ.</div>
+          <div className="text-xs text-slate-500">Denne scorelogik gemmes fælles pr. faktor og bruges på tværs af alle initiativer, hvor faktoren indgår. Scores, kommentarer og datagrundlag er stadig specifikke for det enkelte initiativ.</div>
         </div>
         <Badge tone={isNumber ? "green" : "amber"}>{isNumber ? "Talgrænse" : "Kvalitativ"}</Badge>
+      </div>
+      <div className="mb-3 rounded-xl bg-white p-3 ring-1 ring-slate-200">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Beskrivelseslogik for denne faktor</div>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+          {anchorStyleOptions.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => onAnchorStyleChange?.(option.id)}
+              className={`rounded-xl p-3 text-left text-xs ring-1 transition hover:-translate-y-0.5 hover:shadow-sm ${anchorStyle === option.id ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-200"}`}
+            >
+              <div className="font-semibold">{option.name}</div>
+              <div className={`mt-1 leading-relaxed ${anchorStyle === option.id ? "text-slate-100" : "text-slate-500"}`}>{option.hint}</div>
+            </button>
+          ))}
+        </div>
       </div>
       {showAbsoluteCalibration ? (
         <div className="grid gap-2 md:grid-cols-[1fr_1fr]">
@@ -909,7 +1060,7 @@ function MatrixDiagram({ valueBest, feasibilityBest, valueLow, valueHigh, feasib
   );
 }
 
-function PrintReport({ company, directType, maturityOption, initiativeName, initiativeLink, anchorStyleLabel, factorCounts, valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh, confidence, status, roiProxy, factorReportRows, criticalUnscoredRows, overallNotes, onClose }) {
+function PrintReport({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyleLabel, factorCounts, valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh, confidence, status, roiProxy, factorReportRows, criticalUnscoredRows, overallNotes, onClose }) {
   const scoredRows = factorReportRows.filter((row) => row.score.touched);
   const unscoredRowsWithComments = factorReportRows.filter((row) => !row.score.touched && factorCommentText(row));
   return (
@@ -945,7 +1096,7 @@ function PrintReport({ company, directType, maturityOption, initiativeName, init
             <div><span className="font-semibold">Virksomhed:</span> {company.name}</div>
             <div><span className="font-semibold">Initiativtype:</span> {directType.name}</div>
             <div><span className="font-semibold">Beslutningsniveau:</span> {maturityOption.name}</div>
-            <div><span className="font-semibold">Scorelogik:</span> {anchorStyleLabel}</div>
+            <div><span className="font-semibold">Standard scorelogik:</span> {defaultAnchorStyleLabel}</div>
             <div className="md:col-span-2"><span className="font-semibold">Initiativbeskrivelse:</span> {initiativeLink ? <span className="break-all">{normalizeInitiativeLink(initiativeLink)}</span> : "Ikke tilføjet"}</div>
           </div>
         </section>
@@ -985,6 +1136,7 @@ function PrintReport({ company, directType, maturityOption, initiativeName, init
                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{row.factor.dim}</div>
                   <h3 className="text-base font-semibold">{row.factor.name}</h3>
                   <div className="mt-1 text-xs text-slate-500">Tags: {row.factor.tags.join(", ")}</div>
+                  <div className="mt-1 text-xs text-slate-500">Beskrivelseslogik: {row.anchorStyleName}</div>
                 </div>
                 <div className="rounded-xl bg-slate-50 p-3 text-sm ring-1 ring-slate-200">
                   <div><span className="font-semibold">Valgt score:</span> {scoreIntervalText(row.score)}</div>
@@ -1069,6 +1221,7 @@ export default function BuviScoringPrototype() {
   const [savedAt, setSavedAt] = useState(savedState?.savedAt || null);
   const [storageStatus, setStorageStatus] = useState(savedState ? "Indlæst fra denne browser" : "Ikke gemt endnu");
   const [exportStatus, setExportStatus] = useState("");
+  const [shareStatus, setShareStatus] = useState("");
   const [showPrintReport, setShowPrintReport] = useState(false);
   const [resetCounter, setResetCounter] = useState(0);
 
@@ -1138,12 +1291,13 @@ export default function BuviScoringPrototype() {
   const normalizedInitiativeLink = normalizeInitiativeLink(initiativeLink);
   const exportResult = { valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh, confidence, roiProxy, status: status.label };
   const workshopSummary = buildWorkshopSummary({ company, directType, maturityOption, initiativeName, initiativeLink, valueBest, feasibilityBest, valueLow, valueHigh, feasibilityLow, feasibilityHigh, confidence, status, roiProxy, factorCounts, overallNotes });
-  const exportPayload = buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, anchorStyle, factorCounts, factors, scores, anchorConfigBank, result: exportResult, overallNotes });
+  const exportPayload = buildExportPayload({ company, directType, maturityOption, initiativeName, initiativeLink, defaultAnchorStyle: anchorStyle, factorCounts, factors, scores, anchorConfigBank, result: exportResult, overallNotes });
   const factorReportRows = factors.map((factor) => {
     const centerConfig = getCenterConfig(factor);
-    const anchors = buildAnchors(factor, centerConfig, anchorStyle);
+    const factorAnchorStyle = getFactorAnchorStyle(anchorConfigBank, factor, anchorStyle);
+    const anchors = buildAnchors(factor, centerConfig, factorAnchorStyle);
     const score = normalizeScoreRange(scores[factor.id] || { low: null, high: null, confidence: 2, assumption: "", touched: false });
-    return { factor, centerConfig, anchors, score };
+    return { factor, centerConfig, anchors, score, anchorStyle: factorAnchorStyle, anchorStyleName: anchorStyleOptions.find((item) => item.id === factorAnchorStyle)?.name || factorAnchorStyle };
   });
   const criticalUnscoredRows = factorReportRows.filter((row) => !row.score.touched && isCriticalUnscoredFactor(row.factor));
   const factorDescriptionGroups = groupFactorsByDimension(factors);
@@ -1157,6 +1311,10 @@ export default function BuviScoringPrototype() {
   const rectW = hasMatrixRange ? Math.abs(((feasibilityHigh - feasibilityLow) / 12) * 84) : null;
   const rectH = hasMatrixRange ? Math.abs(((valueHigh - valueLow) / 12) * 84) : null;
   const statusClass = { green: "bg-emerald-50 ring-emerald-200", amber: "bg-amber-50 ring-amber-200", red: "bg-rose-50 ring-rose-200", gray: "bg-slate-50 ring-slate-200", blue: "bg-sky-50 ring-sky-200" }[status.tone] || "bg-sky-50 ring-sky-200";
+  const copyShareLink = async (url) => {
+    const ok = await copyTextToClipboard(url);
+    setShareStatus(ok ? "Link kopieret" : "Kunne ikke kopiere link automatisk");
+  };
 
   return (
     <>
@@ -1168,7 +1326,7 @@ export default function BuviScoringPrototype() {
           maturityOption={maturityOption}
           initiativeName={initiativeName}
           initiativeLink={initiativeLink}
-          anchorStyleLabel={activeAnchorStyle.name}
+          defaultAnchorStyleLabel={activeAnchorStyle.name}
           factorCounts={factorCounts}
           valueBest={valueBest}
           feasibilityBest={feasibilityBest}
@@ -1219,10 +1377,12 @@ export default function BuviScoringPrototype() {
           </CardContent>
         </Card>
 
+        <ShareLinkQrBlock onCopy={copyShareLink} status={shareStatus} />
+
         <div className="grid gap-4 lg:grid-cols-4">
-          <Card className="lg:col-span-3">
+          <Card className={`lg:col-span-3 ${SECTION_THEMES.configuration.card}`}>
             <CardContent className="p-5">
-              <div className="mb-4 flex items-center gap-2"><Icon label="1" /><h2 className="text-lg font-semibold">1. Konfiguration</h2></div>
+              <SectionHeader label="1" title="1. Konfiguration" theme={SECTION_THEMES.configuration} />
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <SelectField label="Virksomhed" value={companyId} onChange={setCompanyId} options={companies} hint={company.label} />
                 <SelectField label="Initiativtype" value={initiativeType} onChange={setInitiativeType} options={initiativeTypes} hint={directType.hint} />
@@ -1248,9 +1408,9 @@ export default function BuviScoringPrototype() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className={SECTION_THEMES.engine.card}>
             <CardContent className="p-5">
-              <div className="mb-3 flex items-center gap-2"><Icon label="M" /><h2 className="text-lg font-semibold">Motoren vælger</h2></div>
+              <SectionHeader label="M" title="Motoren vælger" theme={SECTION_THEMES.engine} />
               <div className="space-y-3 text-sm">
                 <div className="rounded-xl bg-slate-100 p-3"><div className="text-xs text-slate-500">Branchepakke</div><div className="font-medium">{company.package}</div></div>
                 <div className="rounded-xl bg-slate-100 p-3"><div className="text-xs text-slate-500">Faktorer i skema</div><div className="font-medium">{factors.length} faktorer</div><div className="mt-1 text-xs text-slate-500">{factorCounts.value} Værdi / {factorCounts.feasibility} Gennemførlighed</div></div>
@@ -1261,14 +1421,15 @@ export default function BuviScoringPrototype() {
           </Card>
         </div>
 
-        <Card>
+        <Card className={SECTION_THEMES.standardLogic.card}>
           <CardContent className="p-5">
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <div className="mb-2 flex items-center gap-2"><Icon label="2" /><h2 className="text-lg font-semibold">2. Beskrivelseslogik for score-niveauer</h2></div>
-                <p className="max-w-3xl text-sm text-slate-600">Her vælger du, hvordan score 0, 3, 6, 9 og 12 skal beskrives. Ved absolutte scoregrænser angiver du kun score 6-niveauet for hver faktor. Prototypen danner automatisk de øvrige anchor statements ud fra center-niveauet.</p>
+                <SectionHeader label="2" title="2. Standardlogik for nye faktorbeskrivelser" theme={SECTION_THEMES.standardLogic}>
+                  <p className="max-w-3xl">Her vælger du kun standardlogikken. Den bruges som fallback for faktorer, der ikke har fået egen beskrivelseslogik endnu. Den konkrete logik vælges nu pr. faktor i sektion 3.</p>
+                </SectionHeader>
               </div>
-              <div className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-700 lg:max-w-md"><span className="font-semibold">Sådan scorer du:</span> Ingen score er valgt fra start. Klik på én scorebeskrivelse for ét samlet skøn. Klik på den valgte igen for at vælge den fra. Klik på en anden score for at danne et lavt-højt interval. Klik uden for intervallet for at udvide lav/høj grænsen; klik inde i intervallet for at samle vurderingen på én score.</div>
+              <div className={`rounded-2xl p-4 text-sm text-slate-700 ring-1 lg:max-w-md ${SECTION_THEMES.standardLogic.soft}`}><span className="font-semibold">Bemærk:</span> Beskrivelseslogik kan nu vælges pr. faktor under “Fælles faktorbeskrivelser”. Det gør det muligt at bruge fx absolutte scoregrænser på CO2 og dokumentationssprog på greenwashing.</div>
             </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {anchorStyleOptions.map((option) => (
@@ -1278,18 +1439,19 @@ export default function BuviScoringPrototype() {
                 </button>
               ))}
             </div>
-            <div className="mt-4 rounded-2xl bg-slate-100 p-4 text-sm text-slate-700"><span className="font-semibold">Aktiv logik:</span> {activeAnchorStyle.name}. <span className="text-slate-500">Scoren kan også stå tom. En tom faktor tæller ikke med i resultatberegningen.</span></div>
+            <div className="mt-4 rounded-2xl bg-slate-100 p-4 text-sm text-slate-700"><span className="font-semibold">Standardlogik:</span> {activeAnchorStyle.name}. <span className="text-slate-500">Individuelle faktorvalg i sektion 3 har forrang over denne standard.</span></div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={SECTION_THEMES.factorDescriptions.card}>
           <CardContent className="p-5">
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <div className="mb-2 flex items-center gap-2"><Icon label="3" /><h2 className="text-lg font-semibold">3. Fælles faktorbeskrivelser</h2></div>
-                <p className="max-w-4xl text-sm text-slate-600">Her redigeres den fælles scoreforståelse pr. faktor. Ændringer gemmes i anchorConfigBank og bruges på tværs af alle initiativer, hvor faktoren indgår. Den konkrete scoring, kommentarer og datagrundlag ligger i næste sektion og er specifikke for det aktive initiativ.</p>
+                <SectionHeader label="3" title="3. Fælles faktorbeskrivelser" theme={SECTION_THEMES.factorDescriptions}>
+                  <p className="max-w-4xl">Her redigeres den fælles scoreforståelse pr. faktor. Ændringer gemmes i anchorConfigBank og bruges på tværs af alle initiativer, hvor faktoren indgår. Den konkrete scoring, kommentarer og datagrundlag ligger i næste sektion og er specifikke for det aktive initiativ.</p>
+                </SectionHeader>
               </div>
-              <div className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-700 lg:max-w-md"><span className="font-semibold">Arkitekturregel:</span> Fælles faktorbeskrivelser skriver til anchorConfigBank. Initiativscoring skriver til den aktive vurdering.</div>
+              <div className={`rounded-2xl p-4 text-sm text-slate-700 ring-1 lg:max-w-md ${SECTION_THEMES.factorDescriptions.soft}`}><span className="font-semibold">Arkitekturregel:</span> Fælles faktorbeskrivelser skriver til anchorConfigBank. Initiativscoring skriver til den aktive vurdering.</div>
             </div>
             <div className="grid gap-4 xl:grid-cols-2">
               {[
@@ -1307,12 +1469,13 @@ export default function BuviScoringPrototype() {
                   <div className="space-y-4">
                     {group.factors.map((factor) => {
                       const centerConfig = getCenterConfig(factor);
-                      const anchors = buildAnchors(factor, centerConfig, anchorStyle);
+                      const factorAnchorStyle = getFactorAnchorStyle(anchorConfigBank, factor, anchorStyle);
+                      const anchors = buildAnchors(factor, centerConfig, factorAnchorStyle);
                       return (
                         <article key={factor.id} className="rounded-2xl border border-slate-200 bg-white p-4">
                           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                             <div>
-                              <div className="flex flex-wrap items-center gap-2"><Badge tone={group.tone}>{factor.dim}</Badge><h4 className="font-semibold">{factor.name}</h4></div>
+                              <div className="flex flex-wrap items-center gap-2"><Badge tone={group.tone}>{factor.dim}</Badge><h4 className="font-semibold">{factor.name}</h4><Badge>{anchorStyleOptions.find((item) => item.id === factorAnchorStyle)?.name || factorAnchorStyle}</Badge></div>
                               <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">{factor.tags.slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
                             </div>
                             <Badge tone="blue">Fælles pr. faktor</Badge>
@@ -1320,7 +1483,7 @@ export default function BuviScoringPrototype() {
                           <details className="rounded-2xl bg-slate-50 p-3 text-sm ring-1 ring-slate-200">
                             <summary className="cursor-pointer font-semibold text-slate-700">Rediger fælles faktorbeskrivelse</summary>
                             <div className="mt-3">
-                              <CenterConfigEditor factor={factor} config={centerConfig} anchorStyle={anchorStyle} currentCenterStatement={anchors[6]} onChange={(nextConfig) => updateCenterConfig(factor.id, nextConfig)} />
+                              <CenterConfigEditor factor={factor} config={centerConfig} anchorStyle={factorAnchorStyle} currentCenterStatement={anchors[6]} onChange={(nextConfig) => updateCenterConfig(factor.id, nextConfig)} onAnchorStyleChange={(nextStyle) => setAnchorConfigBank((prev) => updateFactorAnchorStyle(prev, factor.id, nextStyle))} />
                             </div>
                           </details>
                           <details className="mt-3 rounded-2xl bg-slate-50 p-3 text-sm ring-1 ring-slate-200">
@@ -1345,10 +1508,10 @@ export default function BuviScoringPrototype() {
         </Card>
 
         <div className="grid gap-4 xl:grid-cols-3">
-          <Card className="xl:col-span-2">
+          <Card className={`xl:col-span-2 ${SECTION_THEMES.scoring.card}`}>
             <CardContent className="p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2"><Icon label="4" /><h2 className="text-lg font-semibold">4. Initiativscoring</h2></div>
+                <div className="flex items-center gap-2"><SectionIcon label="4" theme={SECTION_THEMES.scoring} /><h2 className="text-lg font-semibold">4. Initiativscoring</h2><span className={`hidden rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 md:inline-flex ${SECTION_THEMES.scoring.soft}`}>{SECTION_THEMES.scoring.label}</span></div>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={() => { const ok = downloadJsonFile(exportPayload, initiativeName || "buvi-vurdering"); setExportStatus(ok ? "JSON-eksport er hentet" : "JSON-eksport fejlede"); }} className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white shadow-sm hover:bg-slate-800">Eksportér JSON</button>
                   <button type="button" onClick={async () => { const ok = await copyTextToClipboard(workshopSummary); setExportStatus(ok ? "Opsummering kopieret" : "Kunne ikke kopiere automatisk"); }} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Kopiér opsummering</button>
@@ -1361,7 +1524,8 @@ export default function BuviScoringPrototype() {
                 {factors.map((factor) => {
                   const score = normalizeScoreRange(scores[factor.id] || { low: null, high: null, confidence: 2, assumption: "", touched: false });
                   const centerConfig = getCenterConfig(factor);
-                  const anchors = buildAnchors(factor, centerConfig, anchorStyle);
+                  const factorAnchorStyle = getFactorAnchorStyle(anchorConfigBank, factor, anchorStyle);
+                  const anchors = buildAnchors(factor, centerConfig, factorAnchorStyle);
                   const best = bestScore(score);
                   return (
                     <article key={factor.id} className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -1400,9 +1564,9 @@ export default function BuviScoringPrototype() {
           </Card>
 
           <div className="space-y-4">
-            <Card>
+            <Card className={SECTION_THEMES.result.card}>
               <CardContent className="p-5">
-                <div className="mb-3 flex items-center gap-2"><Icon label="5" /><h2 className="text-lg font-semibold">5. Resultat</h2></div>
+                <div className="mb-3 flex items-center gap-2"><SectionIcon label="5" theme={SECTION_THEMES.result} /><h2 className="text-lg font-semibold">5. Resultat</h2></div>
                 <div className="space-y-3">
                   <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
                     <div className="mb-2 flex items-center justify-between gap-2">
@@ -1436,7 +1600,7 @@ export default function BuviScoringPrototype() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={SECTION_THEMES.result.card}>
               <CardContent className="p-5">
                 <h2 className="mb-3 text-lg font-semibold">Værdi vs. gennemførlighed</h2>
                 <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
@@ -1445,9 +1609,9 @@ export default function BuviScoringPrototype() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={SECTION_THEMES.gates.card}>
               <CardContent className="p-5">
-                <div className="mb-3 flex items-center gap-2"><Icon label="6" /><h2 className="text-lg font-semibold">6. Gates og næste skridt</h2></div>
+                <div className="mb-3 flex items-center gap-2"><SectionIcon label="6" theme={SECTION_THEMES.gates} /><h2 className="text-lg font-semibold">6. Gates og næste skridt</h2></div>
                 <div className="space-y-2 text-sm">
                   {confidence < 3 && <div className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">Datagrundlaget er lavt: brug resultatet til dialog og databehov, ikke ekstern kommunikation.</div>}
                   {factors.some((factor) => factor.id === "greenwashing" && ((scores[factor.id] && bestScore(scores[factor.id])) || 12) < 6) && <div className="rounded-xl bg-rose-50 p-3 ring-1 ring-rose-200">Greenwashing-gate: grønne udsagn bør ikke publiceres før dokumentation og formulering er forbedret.</div>}
@@ -1468,6 +1632,7 @@ export default function BuviScoringPrototype() {
             <div className="max-w-2xl text-xs leading-relaxed text-slate-500 md:text-right">
               <p>{BRANDING.output.confidentialityNote}</p>
               <p className="mt-2">{BRANDING.tool.context}</p>
+              <p className="mt-2"><span className="font-semibold text-slate-700">Workshoplink:</span> {SHARE_LINK.displayShortUrl}</p>
             </div>
           </div>
         </footer>
