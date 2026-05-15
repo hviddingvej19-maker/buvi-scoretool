@@ -70,6 +70,22 @@ Denne version betragtes som en workshopkandidat, ikke som en endelig produktvers
 - Der er ikke tests i et formaliseret testframework endnu.
 - Lint er ikke groent pr. 2026-05-15, selv om production build virker.
 
+### Release-note om versioner
+
+Der skal kun vaere en aktiv versionstreng i releasekandidaten. Backlog, UI, PDF/eksport og interne prototype-tests skal bruge samme versionsnavn inden release-freeze.
+
+Aktuel beslutning for workshopkandidaten:
+
+```text
+v0.3.19-clean-blank-pdf
+```
+
+Foreslaaet endeligt release-tag efter sidste stabilitetstest:
+
+```text
+v0.3.20-workshop-release
+```
+
 ## 3. Centrale designbeslutninger
 
 ### 3.1 Lokal lagring
@@ -362,11 +378,76 @@ Acceptance criteria:
 - kopier tekst virker
 - gem datafil virker
 - test udfoert i workshop-browser/laptop
+- versionstreng er synkroniseret mellem `src/App.jsx`, `BACKLOG.md`, UI, PDF/eksport og interne prototype-tests
 
 Anbefalet commitnavn:
 
 ```text
 Freeze BUVI workshop release v0.3.20
+```
+
+### P1 - Gem referencefiler for workshopversion
+
+**Status:** aaben  
+**Foreslaaet version:** samme release som freeze
+
+Formaal:
+
+Sikre at der findes dokumentation og testmateriale til senere videreudvikling, saa fremtidige aendringer kan sammenlignes med den version, der faktisk blev brugt i workshoppen.
+
+Acceptance criteria:
+
+Gem foelgende lokalt eller i en dokumentationsmappe i repoet:
+
+- aktiv initiativ-PDF
+- samlet workshop-PDF
+- samlet JSON/datafil
+- screenshot af forsiden
+- screenshot af sammenligningsmatrix
+- screenshot af kommentarflow
+- public link med cache-busting, fx `?v=workshop-release-0320`
+- kort note om hvilken browser/laptop der er testet paa
+
+### P1 - GitHub tag/release
+
+**Status:** aaben  
+**Foreslaaet tag:** `v0.3.20-workshop-release`
+
+Formaal:
+
+Sikre at workshopversionen kan findes igen praecist, selv om `main` senere bruges til videreudvikling.
+
+Acceptance criteria:
+
+- tag er oprettet i GitHub
+- GitHub release note er skrevet
+- public link er verificeret efter deploy
+- release note naevner kendte begraensninger
+- release note linker til eller omtaler `BACKLOG.md`
+
+Foreslaaet release note:
+
+```text
+BUVI/OxF workshop release v0.3.20
+
+Stabil workshopversion med:
+- ProBalance-branding
+- lokal browserlagring
+- flere initiativer
+- faelles scoreforklaringer
+- initiativspecifik scoring
+- kommentar-chips
+- sammenligningsmatrix
+- aktiv initiativ-PDF
+- samlet workshop-PDF
+- nulstilling af scoring og kommentarer
+- ren PDF efter nulstilling
+
+Kendte begraensninger:
+- data gemmes kun lokalt i browseren
+- ingen faelles facilitator-database
+- ingen central opsamling paa tvaers af deltagere
+- faktorbank aendres stadig i kode
 ```
 
 ## 6. Nye backlogkort fra kodekvalitetsgennemgang
@@ -377,7 +458,7 @@ Seneste lokale commit ved gennemgang: `5891783 BUVI-workshop-release-v0.3.19`
 
 Checks udfoert:
 
-- `npm.cmd ci`: gennemfoert uden kendte sårbarheder
+- `npm ci`: gennemfoert uden kendte sårbarheder
 - `npm.cmd run build`: gennemfoert og production build virker
 - `npm.cmd run lint`: fejler med 5 errors og 1 warning i `src/App.jsx`
 
@@ -415,13 +496,14 @@ Relevant kode:
 
 **Status:** aaben  
 **Type:** releasekvalitet  
-**Rationale:** Backloggen beskriver aktuel version som `v0.3.19-clean-blank-pdf`, mens koden har `APP_VERSION = "BUVI-workshop-release-v0.3.19"`. Samtidig forventer den interne prototype-test tekstbidet `clean-blank-pdf`. Det gør versionsstatus uklar og gør den interne test mindre troværdig.
+**Rationale:** Backloggen beskriver aktuel version som `v0.3.19-clean-blank-pdf`, mens GitHub-koden tidligere har brugt `APP_VERSION = "BUVI-workshop-release-v0.3.19"`. Canvas-versionen og den interne prototype-test bruger `clean-blank-pdf`. Det goer versionsstatus uklar, hvis det ikke er ryddet op foer release-freeze.
 
 Acceptance criteria:
 
 - UI-version, backlog og release-commit bruger samme versionsnavn
 - intern prototype-test matcher det faktiske versionsnavn eller flyttes til formaliseret test
-- versionsnavnet fremgår tydeligt i appens eksport/PDF, hvis det skal bruges som workshop-dokumentation
+- versionsnavnet fremgaar tydeligt i appens eksport/PDF, hvis det skal bruges som workshop-dokumentation
+- anbefalet endeligt release-navn er valgt og dokumenteret, fx `v0.3.20-workshop-release`
 
 Relevant kode:
 
@@ -458,27 +540,27 @@ Relevant kode:
 - `package.json:6`
 - `.github/workflows/deploy.yml:31`
 
-### P1 - Split `App.jsx` i data, domænelogik og UI-komponenter
+### P1 - Split `App.jsx` i data, domaenelogik og UI-komponenter
 
 **Status:** aaben  
 **Type:** vedligeholdelse  
-**Rationale:** `src/App.jsx` er ca. 1.600 linjer og indeholder samtidig data, scorelogik, localStorage, eksport, printkomponenter og UI. Det øger risikoen for regressionsfejl, fordi små ændringer i UI kan påvirke kerneberegninger.
+**Rationale:** `src/App.jsx` er ca. 1.600 linjer og indeholder samtidig data, scorelogik, localStorage, eksport, printkomponenter og UI. Det oeger risikoen for regressionsfejl, fordi smaa aendringer i UI kan paavirke kerneberegninger.
 
 Foreslaaet opdeling:
 
 - `src/data/factors.js` til virksomheder, initiativtyper, faktorbank og anchor-konfiguration
-- `src/domain/scoring.js` til scoreintervaller, vægtede gennemsnit, status og matrixgeometri
+- `src/domain/scoring.js` til scoreintervaller, vaegtede gennemsnit, status og matrixgeometri
 - `src/domain/storage.js` til localStorage-load/save/reset og migrering
 - `src/domain/export.js` til JSON- og tekstpayloads
 - `src/components/*` til kort, matrix, scoring, print og eksport
 
 Acceptance criteria:
 
-- ingen funktionel ændring i workshopflowet
+- ingen funktionel aendring i workshopflowet
 - `npm.cmd run build` er groent
 - `npm.cmd run lint` er groent
-- eksisterende localStorage-data fra `STORAGE_KEY` kan stadig indlæses
-- aktiv PDF og samlet workshop-PDF viser samme indhold som før refaktoreringen
+- eksisterende localStorage-data fra `STORAGE_KEY` kan stadig indlaeses
+- aktiv PDF og samlet workshop-PDF viser samme indhold som foer refaktoreringen
 
 Relevant kode:
 
@@ -489,11 +571,11 @@ Relevant kode:
 - `src/App.jsx:1183`
 - `src/App.jsx:1336`
 
-### P1 - Gør deployment reproducerbar med `npm ci` og predeploy-checks
+### P1 - Goer deployment reproducerbar med `npm ci` og predeploy-checks
 
 **Status:** aaben  
 **Type:** CI/CD  
-**Rationale:** GitHub Pages-workflowet bruger `npm install`, selv om projektet har `package-lock.json`. Det kan give små forskelle mellem lokale builds og GitHub Pages. Deployment bør bruge lockfile deterministisk og stoppe før deploy, hvis lint/test/build fejler.
+**Rationale:** GitHub Pages-workflowet bruger `npm install`, selv om projektet har `package-lock.json`. Det kan give smaa forskelle mellem lokale builds og GitHub Pages. Deployment boer bruge lockfile deterministisk og stoppe foer deploy, hvis lint/test/build fejler.
 
 Acceptance criteria:
 
@@ -514,20 +596,20 @@ Relevant kode:
 
 **Status:** aaben  
 **Type:** test/fastholdelse af funktionalitet  
-**Rationale:** De vigtigste risici handler ikke kun om beregninger, men om at workshoppen ikke mister data eller PDF-output under brug. Der bør være faste scenarier, der gentages før release.
+**Rationale:** De vigtigste risici handler ikke kun om beregninger, men om at workshoppen ikke mister data eller PDF-output under brug. Der boer vaere faste scenarier, der gentages foer release.
 
 Acceptance criteria:
 
 - opret nyt initiativ, score to faktorer og gem lokalt
 - skift mellem to initiativer uden at score eller kommentarer forsvinder
-- dupliker et initiativ og verificer at kopien kan ændres uafhængigt
-- nulstil aktiv scoring og verificer at kommentarer, noter og metodeadvarsler er væk
+- dupliker et initiativ og verificer at kopien kan aendres uafhaengigt
+- nulstil aktiv scoring og verificer at kommentarer, noter og metodeadvarsler er vaek
 - slet lokal data og verificer ren starttilstand
 - lav aktiv PDF med kommentarer
 - lav samlet workshop-PDF med matrix og kommentarer pr. initiativ
 - eksporter aktiv JSON og samlet JSON
 - kopier aktiv tekst og samlet tekst
-- genindlæs siden og verificer at localStorage-data bevares
+- genindlaes siden og verificer at localStorage-data bevares
 
 Foreslaaet automatisering:
 
@@ -544,11 +626,11 @@ Relevant kode:
 - `src/App.jsx:1252`
 - `src/App.jsx:1572`
 
-### P1 - Versionér localStorage-schema og migrationsregler
+### P1 - Versioner localStorage-schema og migrationsregler
 
 **Status:** aaben  
 **Type:** datakvalitet/fastholdelse af funktionalitet  
-**Rationale:** Appen understøtter ældre state-former via fallback, men der er ikke en tydelig schema-version eller migreringsstrategi. Det er vigtigt, fordi workshopdata ligger lokalt i browseren og ikke må gå tabt ved fremtidige ændringer.
+**Rationale:** Appen understoetter aeldre state-former via fallback, men der er ikke en tydelig schema-version eller migreringsstrategi. Det er vigtigt, fordi workshopdata ligger lokalt i browseren og ikke maa gaa tabt ved fremtidige aendringer.
 
 Acceptance criteria:
 
@@ -556,7 +638,7 @@ Acceptance criteria:
 - migrering fra tidligere `activeAssessment`-format er eksplicit testet
 - manglende eller defekte felter normaliseres uden at slette brugerdata
 - fejl ved korrupt localStorage giver ren fallback og synlig status
-- release-noter beskriver, hvis en version ændrer lokal datamodel
+- release-noter beskriver, hvis en version aendrer lokal datamodel
 
 Relevant kode:
 
@@ -568,7 +650,7 @@ Relevant kode:
 
 **Status:** aaben  
 **Type:** oprydning  
-**Rationale:** Repoet indeholder Vite/React-template-rester, som ikke ser ud til at være del af BUVI-værktøjet. Det gør projektet mere støjende og kan forvirre fremtidig vedligeholdelse.
+**Rationale:** Repoet indeholder Vite/React-template-rester, som ikke ser ud til at vaere del af BUVI-vaerktoejet. Det goer projektet mere stoejende og kan forvirre fremtidig vedligeholdelse.
 
 Mulige oprydninger:
 
@@ -589,21 +671,21 @@ Relevant kode:
 - `src/App.css:1`
 - `README.md:1`
 
-### P2 - Tilføj tilgængeligheds- og responsivitetssmoke-test
+### P2 - Tilfoej tilgaengeligheds- og responsivitetssmoke-test
 
 **Status:** aaben  
 **Type:** UX/test  
-**Rationale:** Værktøjet bruges live i workshop og til PDF-output. Det bør testes på de skærmstørrelser og browsere, der bruges i praksis, så layout, knapper og matrix ikke bryder.
+**Rationale:** Vaerktoejet bruges live i workshop og til PDF-output. Det boer testes paa de skaermstoerrelser og browsere, der bruges i praksis, saa layout, knapper og matrix ikke bryder.
 
 Acceptance criteria:
 
-- desktop smoke-test ved typisk facilitator-skærm
+- desktop smoke-test ved typisk facilitator-skaerm
 - laptop smoke-test ved workshop-laptop
-- mobil/tablet sanity check for læsbarhed
-- tastaturfokus kan bruges på primære handlinger
+- mobil/tablet sanity check for laesbarhed
+- tastaturfokus kan bruges paa primaere handlinger
 - tekst i knapper og kort overlapper ikke
 - printvisning skjuler normal app og viser korrekt PDF-rapport
-- matrixlabels og punkter er læsbare i print
+- matrixlabels og punkter er laesbare i print
 
 Foreslaaet automatisering:
 
@@ -612,9 +694,9 @@ Foreslaaet automatisering:
 
 ## 7. Releaseprincip for workshopversion
 
-Før workshop bør der laves en bevidst release-freeze, hvor der kun rettes P0-fejl.
+Foer workshop boer der laves en bevidst release-freeze, hvor der kun rettes P0-fejl.
 
-Minimum før push til public workshopversion:
+Minimum foer push til public workshopversion:
 
 - build er groent
 - lint er enten groent eller kendte lint-fejl er eksplicit accepteret
@@ -622,5 +704,7 @@ Minimum før push til public workshopversion:
 - PDF-output er visuelt tjekket
 - GitHub Pages viser forventet version
 - facilitator har testet paa den faktiske workshopmaskine/browser
+- referencefiler er gemt
+- GitHub tag/release er oprettet
 
-Efter freeze bør nye funktioner parkeres som backlogkort, medmindre de retter en konkret workshopblokering.
+Efter freeze boer nye funktioner parkeres som backlogkort, medmindre de retter en konkret workshopblokering.
