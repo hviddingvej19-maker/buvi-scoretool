@@ -1,28 +1,28 @@
-# BUVI/OxF scoringsvaerktoej - backlog og udviklingslog
+# BUVI/OxF scoringsværktøj - backlog og udviklingslog
 
 Senest opdateret: 2026-05-15  
 Aktuel workshopversion: `v0.3.19-clean-blank-pdf`  
 Repository: `hviddingvej19-maker/buvi-scoretool`  
 Public app: `https://hviddingvej19-maker.github.io/buvi-scoretool/`
 
-Dette dokument er projektets faelles backlog, udviklingslog og handover-note. Det er lavet, saa baade ChatGPT-traaden, Codex og fremtidige udviklingssessioner kan se:
+Dette dokument er projektets fælles backlog, udviklingslog og handover-note. Det er lavet, så både ChatGPT-tråden, Codex og fremtidige udviklingssessioner kan se:
 
-- hvad der allerede er gennemfoert
-- hvorfor aendringerne blev lavet
-- hvad der stadig er aabent
+- hvad der allerede er gennemført
+- hvorfor ændringerne blev lavet
+- hvad der stadig er åbent
 - hvad der bevidst er parkeret til efter workshoppen
-- hvordan workshopversionen boer fryses og videreudvikles senere
+- hvordan workshopversionen bør fryses og videreudvikles senere
 
-## 1. Projektformaal
+## 1. Projektformål
 
-BUVI/OxF scoringsvaerktoejet er et React/Vite-baseret workshopvaerktoej til vurdering og prioritering af baeredygtighedsinitiativer.
+BUVI/OxF scoringsværktøjet er et React/Vite-baseret workshopværktøj til vurdering og prioritering af bæredygtighedsinitiativer.
 
-Vaerktoejet bruges i en workshop, hvor virksomheder eller organisationer vurderer egne initiativer ud fra to hoveddimensioner:
+Værktøjet bruges i en workshop, hvor virksomheder eller organisationer vurderer egne initiativer ud fra to hoveddimensioner:
 
-1. **Vaerdi**
-2. **Gennemfoerlighed**
+1. **Værdi**
+2. **Gennemførlighed**
 
-Scoren skal ikke forstaas som en automatisk beslutningsmaskine. Den skal fungere som beslutningsstoette og dialogvaerktoej. Det vigtigste workshopoutput er derfor baade:
+Scoren skal ikke forstås som en automatisk beslutningsmaskine. Den skal fungere som beslutningsstøtte og dialogværktøj. Det vigtigste workshopoutput er derfor både:
 
 - score
 - scoreinterval/usikkerhed
@@ -31,7 +31,7 @@ Scoren skal ikke forstaas som en automatisk beslutningsmaskine. Den skal fungere
 - antagelser
 - uenigheder
 - databehov
-- naeste afklaring
+- næste afklaring
 - sammenligning af flere initiativer
 
 ## 2. Aktuel workshopstatus
@@ -45,7 +45,7 @@ Denne version betragtes som en workshopkandidat, ikke som en endelig produktvers
 - ProBalance-branding
 - lokal browserlagring
 - flere initiativer
-- faelles scoreforklaring pr. faktor
+- fælles scoreforklaring pr. faktor
 - initiativspecifik scoring
 - scoreintervaller med 0 / 3 / 6 / 9 / 12
 - datagrundlag 1-5
@@ -56,23 +56,23 @@ Denne version betragtes som en workshopkandidat, ikke som en endelig produktvers
 - samlet workshop-PDF
 - nulstilling af scoring og kommentarer
 - ren PDF efter nulstilling
-- sikkerhedsadvarsel foer sletning og nulstilling
+- sikkerhedsadvarsel før sletning og nulstilling
 
-### Kendte begraensninger i workshopversionen
+### Kendte begrænsninger i workshopversionen
 
 - Data gemmes kun lokalt i brugerens browser.
 - Der findes ingen central facilitator-database.
-- Der findes ingen faelles opsamling paa tvaers af deltagere.
-- Faktorbank og standarddata aendres stadig i kode.
-- QR/redirect er ikke endeligt loest.
-- PDF-layout er funktionelt, men ikke designmaessigt faerdigpoleret.
-- Der er ikke et egentlig admin-interface.
+- Der findes ingen fælles opsamling på tværs af deltagere.
+- Faktorbank og standarddata ændres stadig i kode.
+- QR/redirect er ikke endeligt løst.
+- PDF-layout er funktionelt, men ikke designmæssigt færdigpoleret.
+- Der er ikke et egentligt admin-interface.
 - Der er ikke tests i et formaliseret testframework endnu.
-- Lint er ikke groent pr. 2026-05-15, selv om production build virker.
+- Lint er ikke grønt pr. 2026-05-15, selv om production build virker.
 
 ### Release-note om versioner
 
-Der skal kun vaere en aktiv versionstreng i releasekandidaten. Backlog, UI, PDF/eksport og interne prototype-tests skal bruge samme versionsnavn inden release-freeze.
+Der skal kun være én aktiv versionstreng i releasekandidaten. Backlog, UI, PDF/eksport og interne prototype-tests skal bruge samme versionsnavn inden release-freeze.
 
 Aktuel beslutning for workshopkandidaten:
 
@@ -80,7 +80,7 @@ Aktuel beslutning for workshopkandidaten:
 v0.3.19-clean-blank-pdf
 ```
 
-Foreslaaet endeligt release-tag efter sidste stabilitetstest:
+Foreslået endeligt release-tag efter sidste stabilitetstest:
 
 ```text
 v0.3.20-workshop-release
@@ -90,7 +90,7 @@ v0.3.20-workshop-release
 
 ### 3.1 Lokal lagring
 
-Vaerktoejet gemmer scoringer i browserens `localStorage`.
+Værktøjet gemmer scoringer i browserens `localStorage`.
 
 Begrundelse:
 
@@ -105,59 +105,59 @@ Konsekvens:
 - bruger skal selv eksportere PDF/tekst/JSON
 - data er lokal pr. browser og computer
 
-### 3.2 Faelles scoreforklaring vs. initiativscoring
+### 3.2 Fælles scoreforklaring vs. initiativscoring
 
 Der er bevidst skelnet mellem:
 
-- **Faelles scoreforklaring for faktorer**: hvad score 0, 3, 6, 9 og 12 betyder for en faktor
+- **Fælles scoreforklaring for faktorer**: hvad score 0, 3, 6, 9 og 12 betyder for en faktor
 - **Score det aktive initiativ**: den konkrete vurdering af et bestemt initiativ
 
-Denne opdeling er vigtig, fordi flere initiativer kan bruge samme faktorlogik, mens scoring og kommentarer skal vaere forskellige pr. initiativ.
+Denne opdeling er vigtig, fordi flere initiativer kan bruge samme faktorlogik, mens scoring og kommentarer skal være forskellige pr. initiativ.
 
 ### 3.3 Kommentarer er workshopoutput
 
-Kommentarer er ikke kun hjaelpetekst. De er en central del af beslutningsgrundlaget.
+Kommentarer er ikke kun hjælpetekst. De er en central del af beslutningsgrundlaget.
 
 Derfor skal kommentarer:
 
 - vises under hver faktor
 - gemmes pr. initiativ
-- indgaa i aktiv PDF
-- indgaa i samlet workshop-PDF
+- indgå i aktiv PDF
+- indgå i samlet workshop-PDF
 - kunne bruges til at forklare antagelser, uenighed og databehov
 
-### 3.4 Matrix som prioriteringsstoette
+### 3.4 Matrix som prioriteringsstøtte
 
-Matrixen viser initiativer ud fra Vaerdi og Gennemfoerlighed.
+Matrixen viser initiativer ud fra Værdi og Gennemførlighed.
 
 Vigtigt princip:
 
-> Oeverst til hoejre er mest attraktivt, men matrixen er prioriteringsstoette - ikke en endelig beslutning.
+> Øverst til højre er mest attraktivt, men matrixen er prioriteringsstøtte - ikke en endelig beslutning.
 
-## 4. Gennemfoerte kort
+## 4. Gennemførte kort
 
 ### v0.3.1 - Sammenligning af flere initiativer i samme matrix
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P0  
-**Workshopvaerdi:** hoej
+**Workshopværdi:** høj
 
 Deltagerne kan sammenligne flere initiativer visuelt i samme matrix.
 
-Gennemfoert:
+Gennemført:
 
 - flere lokale initiativer i samme browser
-- aktivt initiativ kan vaelges
-- initiativer vises i matrix, naar de har baade vaerdi- og gennemfoerlighedsscore
+- aktivt initiativ kan vælges
+- initiativer vises i matrix, når de har både værdi- og gennemførlighedsscore
 - aktivt initiativ markeres tydeligere
 - initiativliste under matrix
 
-### v0.3.2 - Eksporter samlet initiativliste
+### v0.3.2 - Eksportér samlet initiativliste
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P1
 
-Gennemfoert:
+Gennemført:
 
 - samlet JSON/datafil
 - kopieret samlet initiativliste
@@ -165,72 +165,72 @@ Gennemfoert:
 - matrix med flere initiativer
 - initiativliste med score, status og datagrundlag
 
-### v0.3.4 - Genindfoer print-/PDF-knap og ryd op i eksporthandlinger
+### v0.3.4 - Genindfør print-/PDF-knap og ryd op i eksporthandlinger
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P0/P1
 
-Gennemfoert:
+Gennemført:
 
-- aktiv PDF-knap genindfoert
-- samlet workshop-PDF tilfoejet
+- aktiv PDF-knap genindført
+- samlet workshop-PDF tilføjet
 - eksport samlet under "Deling og eksport"
-- aktiv vurdering og samlet portefoelje adskilt
+- aktiv vurdering og samlet portefølje adskilt
 
-### v0.3.5 - Portefoelje-PDF med sammenligning
+### v0.3.5 - Portefølje-PDF med sammenligning
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P0/P1
 
-Gennemfoert:
+Gennemført:
 
-- portefoelje-PDF
+- portefølje-PDF
 - samlet matrix
 - initiativliste
 - kommentarer pr. initiativ
 - aktivt initiativ markeret
 
-### v0.3.6 - Kommentarer med i portefoelje-PDF
+### v0.3.6 - Kommentarer med i portefølje-PDF
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P0
 
-Gennemfoert:
+Gennemført:
 
 - faktorkommentarer inkluderes i samlet workshop-PDF
 - kommentarer vises pr. initiativ
-- antagelser og databehov bevares i portefoeljeoutput
+- antagelser og databehov bevares i porteføljeoutput
 
 ### v0.3.7 - Comment nudges
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P1
 
-Gennemfoert:
+Gennemført:
 
 - kommentarstatus i resultatkort
-- nudge naar scorede faktorer mangler kommentar
+- nudge når scorede faktorer mangler kommentar
 - tekst der forklarer hvorfor kommentarer er vigtige
 
 ### v0.3.8 - Onboarding clarity
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P0
 
-Gennemfoert:
+Gennemført:
 
 - ny "Start her"-boks
 - trins-flow
-- mere workshop-naer hovedtitel
-- tydeligere forklaring af score, kommentarer og beslutningsstoette
+- mere workshop-nær hovedtitel
+- tydeligere forklaring af score, kommentarer og beslutningsstøtte
 - bedre skelnen mellem scoreforklaring og scoring
 
 ### v0.3.9 - Start her-links
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P1
 
-Gennemfoert:
+Gennemført:
 
 - klikbare trin
 - navigation til relevante sektioner
@@ -238,53 +238,53 @@ Gennemfoert:
 
 ### v0.3.10 - Section navigation
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P1
 
-Gennemfoert:
+Gennemført:
 
-- `Card` understoetter `id` og props
+- `Card` understøtter `id` og props
 - sektioner fik stabile id'er
-- "Tilbage til Start her"-knapper tilfoejet
+- "Tilbage til Start her"-knapper tilføjet
 - tilbageknapper skjules i print
 
 ### v0.3.11 - Fjern navigation artifacts
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P0 bugfix
 
-Gennemfoert:
+Gennemført:
 
 - `$1`-artefakter fjernet
 
 ### v0.3.12 - Kommentar-eksempler og kommentar-chips
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P1
 
-Gennemfoert kommentar-chips:
+Gennemført kommentar-chips:
 
 - Antagelse
 - Uenighed
 - Databehov
-- Naeste afklaring
+- Næste afklaring
 
 ### v0.3.13 - Fix comment template build
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P0 bugfix
 
-Gennemfoert:
+Gennemført:
 
 - build-fejl pga. linjeskift i JavaScript-string rettet
 - intern test for append af kommentar-template
 
 ### v0.3.14 - Reviewed bugfix
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P0 bugfix/stabilisering
 
-Gennemfoert:
+Gennemført:
 
 - samlet kode omskrevet og stabiliseret
 - versionsstyring samlet i `APP_VERSION`
@@ -294,73 +294,73 @@ Gennemfoert:
 
 ### v0.3.15 - Workshop safety polish
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P0/P1
 
-Gennemfoert:
+Gennemført:
 
-- bekraeftelse foer slet initiativ
-- bekraeftelse foer slet lokal data
-- bedre forklaring af dupliker
+- bekræftelse før slet initiativ
+- bekræftelse før slet lokal data
+- bedre forklaring af duplikér
 - tydeligere matrixforklaring
-- PDF-note om matrix som prioriteringsstoette
+- PDF-note om matrix som prioriteringsstøtte
 
 ### v0.3.16 - Reset and switch fix
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P0 bugfix
 
-Gennemfoert:
+Gennemført:
 
 - `resetCounter` fjernet
-- nulstilling sker direkte paa aktivt initiativ
+- nulstilling sker direkte på aktivt initiativ
 - skift mellem initiativer sletter ikke score
-- nulstilling kraever bekraeftelse
+- nulstilling kræver bekræftelse
 
 ### v0.3.17 - Matrix and reset cleanup
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P0 bugfix
 
-Gennemfoert:
+Gennemført:
 
 - matrix bruger oprindeligt initiativnummer
 - aktivt interval vises kun for aktivt scoret initiativ
 - nulstilling lukker PDF-visninger
 - nulstilling rydder scores, kommentarer og noter for aktivt initiativ
-- slet lokal data rydder BUVI-localStorage-noegler
+- slet lokal data rydder BUVI-localStorage-nøgler
 
 ### v0.3.18 - Hard reset comments
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P0 bugfix
 
-Gennemfoert:
+Gennemført:
 
 - reset fjerner hele `scores`-objektet for aktivt initiativ
 - reset fjerner gamle `assumption`-kommentarer
 - reset gemmer direkte i localStorage
 - slet lokal data opretter ren state
-- intern test for at gammel kommentar ikke bliver haengende
+- intern test for at gammel kommentar ikke bliver hængende
 
 ### v0.3.19 - Clean blank PDF
 
-**Status:** gennemfoert  
+**Status:** gennemført  
 **Prioritet:** P0 bugfix/workshop polish
 
-Gennemfoert:
+Gennemført:
 
-- kritiske ikke-scorede faktorer vises ikke paa tom/nulstillet vurdering
-- sektionen vises kun, naar vurderingen er paabegyndt
-- titel aendret til "Automatiske metodeadvarsler"
-- forklaring tilfoejet, saa sektionen ikke forveksles med brugerkommentarer
+- kritiske ikke-scorede faktorer vises ikke på tom/nulstillet vurdering
+- sektionen vises kun, når vurderingen er påbegyndt
+- titel ændret til "Automatiske metodeadvarsler"
+- forklaring tilføjet, så sektionen ikke forveksles med brugerkommentarer
 
-## 5. Aaben backlog foer workshop
+## 5. Åben backlog før workshop
 
 ### P0 - Release freeze og stabilitetstest
 
-**Status:** aaben  
-**Foreslaaet version:** `v0.3.20-workshop-release-freeze`
+**Status:** åben  
+**Foreslået version:** `v0.3.20-workshop-release-freeze`
 
 Acceptance criteria:
 
@@ -375,9 +375,9 @@ Acceptance criteria:
 - matrix virker med to initiativer
 - aktiv PDF virker
 - samlet workshop-PDF virker
-- kopier tekst virker
+- kopiér tekst virker
 - gem datafil virker
-- test udfoert i workshop-browser/laptop
+- test udført i workshop-browser/laptop
 - versionstreng er synkroniseret mellem `src/App.jsx`, `BACKLOG.md`, UI, PDF/eksport og interne prototype-tests
 
 Anbefalet commitnavn:
@@ -388,16 +388,16 @@ Freeze BUVI workshop release v0.3.20
 
 ### P1 - Gem referencefiler for workshopversion
 
-**Status:** aaben  
-**Foreslaaet version:** samme release som freeze
+**Status:** åben  
+**Foreslået version:** samme release som freeze
 
-Formaal:
+Formål:
 
-Sikre at der findes dokumentation og testmateriale til senere videreudvikling, saa fremtidige aendringer kan sammenlignes med den version, der faktisk blev brugt i workshoppen.
+Sikre at der findes dokumentation og testmateriale til senere videreudvikling, så fremtidige ændringer kan sammenlignes med den version, der faktisk blev brugt i workshoppen.
 
 Acceptance criteria:
 
-Gem foelgende lokalt eller i en dokumentationsmappe i repoet:
+Gem følgende lokalt eller i en dokumentationsmappe i repoet:
 
 - aktiv initiativ-PDF
 - samlet workshop-PDF
@@ -406,26 +406,26 @@ Gem foelgende lokalt eller i en dokumentationsmappe i repoet:
 - screenshot af sammenligningsmatrix
 - screenshot af kommentarflow
 - public link med cache-busting, fx `?v=workshop-release-0320`
-- kort note om hvilken browser/laptop der er testet paa
+- kort note om hvilken browser/laptop der er testet på
 
 ### P1 - GitHub tag/release
 
-**Status:** aaben  
-**Foreslaaet tag:** `v0.3.20-workshop-release`
+**Status:** åben  
+**Foreslået tag:** `v0.3.20-workshop-release`
 
-Formaal:
+Formål:
 
-Sikre at workshopversionen kan findes igen praecist, selv om `main` senere bruges til videreudvikling.
+Sikre at workshopversionen kan findes igen præcist, selv om `main` senere bruges til videreudvikling.
 
 Acceptance criteria:
 
 - tag er oprettet i GitHub
 - GitHub release note er skrevet
 - public link er verificeret efter deploy
-- release note naevner kendte begraensninger
+- release note nævner kendte begrænsninger
 - release note linker til eller omtaler `BACKLOG.md`
 
-Foreslaaet release note:
+Foreslået release note:
 
 ```text
 BUVI/OxF workshop release v0.3.20
@@ -434,7 +434,7 @@ Stabil workshopversion med:
 - ProBalance-branding
 - lokal browserlagring
 - flere initiativer
-- faelles scoreforklaringer
+- fælles scoreforklaringer
 - initiativspecifik scoring
 - kommentar-chips
 - sammenligningsmatrix
@@ -443,28 +443,28 @@ Stabil workshopversion med:
 - nulstilling af scoring og kommentarer
 - ren PDF efter nulstilling
 
-Kendte begraensninger:
+Kendte begrænsninger:
 - data gemmes kun lokalt i browseren
-- ingen faelles facilitator-database
-- ingen central opsamling paa tvaers af deltagere
-- faktorbank aendres stadig i kode
+- ingen fælles facilitator-database
+- ingen central opsamling på tværs af deltagere
+- faktorbank ændres stadig i kode
 ```
 
 ## 6. Nye backlogkort fra kodekvalitetsgennemgang
 
-Gennemgang udfoert: 2026-05-15  
-Udgangspunkt: lokal klon af `hviddingvej19-maker/buvi-scoretool` paa `main`  
+Gennemgang udført: 2026-05-15  
+Udgangspunkt: lokal klon af `hviddingvej19-maker/buvi-scoretool` på `main`  
 Seneste lokale commit ved gennemgang: `5891783 BUVI-workshop-release-v0.3.19`
 
-Checks udfoert:
+Checks udført:
 
-- `npm ci`: gennemfoert uden kendte sårbarheder
-- `npm.cmd run build`: gennemfoert og production build virker
+- `npm ci`: gennemført uden kendte sårbarheder
+- `npm.cmd run build`: gennemført og production build virker
 - `npm.cmd run lint`: fejler med 5 errors og 1 warning i `src/App.jsx`
 
 ### P0 - Gør lint grøn før workshop-release
 
-**Status:** aaben  
+**Status:** åben  
 **Type:** kvalitet/stabilisering  
 **Rationale:** Production build virker, men lint fejler. Det betyder, at release-freeze ikke har et grønt baseline-check, og senere ændringer bliver sværere at kvalitetssikre.
 
@@ -479,10 +479,10 @@ Fund:
 Acceptance criteria:
 
 - `npm.cmd run lint` returnerer exit code 0
-- ingen lint-disable tilfoejes uden kort begrundelse i kode
+- ingen lint-disable tilføjes uden kort begrundelse i kode
 - score-initialisering bevarer eksisterende scores ved skift mellem initiativer
 - lokal gemmestatus vises fortsat korrekt
-- `npm.cmd run build` er stadig groent bagefter
+- `npm.cmd run build` er stadig grønt bagefter
 
 Relevant kode:
 
@@ -494,15 +494,15 @@ Relevant kode:
 
 ### P0 - Synk versionlabel, backlog og interne prototype-tests
 
-**Status:** aaben  
+**Status:** åben  
 **Type:** releasekvalitet  
-**Rationale:** Backloggen beskriver aktuel version som `v0.3.19-clean-blank-pdf`, mens GitHub-koden tidligere har brugt `APP_VERSION = "BUVI-workshop-release-v0.3.19"`. Canvas-versionen og den interne prototype-test bruger `clean-blank-pdf`. Det goer versionsstatus uklar, hvis det ikke er ryddet op foer release-freeze.
+**Rationale:** Backloggen beskriver aktuel version som `v0.3.19-clean-blank-pdf`, mens GitHub-koden tidligere har brugt `APP_VERSION = "BUVI-workshop-release-v0.3.19"`. Canvas-versionen og den interne prototype-test bruger `clean-blank-pdf`. Det gør versionsstatus uklar, hvis det ikke er ryddet op før release-freeze.
 
 Acceptance criteria:
 
 - UI-version, backlog og release-commit bruger samme versionsnavn
 - intern prototype-test matcher det faktiske versionsnavn eller flyttes til formaliseret test
-- versionsnavnet fremgaar tydeligt i appens eksport/PDF, hvis det skal bruges som workshop-dokumentation
+- versionsnavnet fremgår tydeligt i appens eksport/PDF, hvis det skal bruges som workshop-dokumentation
 - anbefalet endeligt release-navn er valgt og dokumenteret, fx `v0.3.20-workshop-release`
 
 Relevant kode:
@@ -512,26 +512,26 @@ Relevant kode:
 
 ### P1 - Flyt prototype-tests til et rigtigt testframework
 
-**Status:** aaben  
+**Status:** åben  
 **Type:** test/fastholdelse af funktionalitet  
-**Rationale:** Der findes interne `console.assert`-tests, men de koeres i browserens runtime og fejler ikke CI eller build paa en kontrolleret maade. Kritisk workshoplogik boer testes automatisk.
+**Rationale:** Der findes interne `console.assert`-tests, men de køres i browserens runtime og fejler ikke CI eller build på en kontrolleret måde. Kritisk workshoplogik bør testes automatisk.
 
-Foreslaaet loesning:
+Foreslået løsning:
 
-- tilfoej Vitest som unit-testframework
-- flyt rene funktioner ud af `App.jsx`, saa de kan importeres i tests
+- tilføj Vitest som unit-testframework
+- flyt rene funktioner ud af `App.jsx`, så de kan importeres i tests
 - opret testscript i `package.json`
-- koer tests i GitHub Actions foer deploy
+- kør tests i GitHub Actions før deploy
 
 Acceptance criteria:
 
-- `npm.cmd test` findes og koerer i CI
-- tests daekker faktorvalg og dimensionbalance
-- tests daekker scoreinterval og bedste bud
-- tests daekker reset af scores, kommentarer og noter
-- tests daekker link-normalisering
-- tests daekker eksportpayload for aktiv vurdering og samlet portefoelje
-- tests daekker matrixflag for scorede/ikke-scorede initiativer
+- `npm.cmd test` findes og kører i CI
+- tests dækker faktorvalg og dimensionbalance
+- tests dækker scoreinterval og bedste bud
+- tests dækker reset af scores, kommentarer og noter
+- tests dækker link-normalisering
+- tests dækker eksportpayload for aktiv vurdering og samlet portefølje
+- tests dækker matrixflag for scorede/ikke-scorede initiativer
 
 Relevant kode:
 
@@ -540,27 +540,27 @@ Relevant kode:
 - `package.json:6`
 - `.github/workflows/deploy.yml:31`
 
-### P1 - Split `App.jsx` i data, domaenelogik og UI-komponenter
+### P1 - Split `App.jsx` i data, domænelogik og UI-komponenter
 
-**Status:** aaben  
+**Status:** åben  
 **Type:** vedligeholdelse  
-**Rationale:** `src/App.jsx` er ca. 1.600 linjer og indeholder samtidig data, scorelogik, localStorage, eksport, printkomponenter og UI. Det oeger risikoen for regressionsfejl, fordi smaa aendringer i UI kan paavirke kerneberegninger.
+**Rationale:** `src/App.jsx` er ca. 1.600 linjer og indeholder samtidig data, scorelogik, localStorage, eksport, printkomponenter og UI. Det øger risikoen for regressionsfejl, fordi små ændringer i UI kan påvirke kerneberegninger.
 
-Foreslaaet opdeling:
+Foreslået opdeling:
 
 - `src/data/factors.js` til virksomheder, initiativtyper, faktorbank og anchor-konfiguration
-- `src/domain/scoring.js` til scoreintervaller, vaegtede gennemsnit, status og matrixgeometri
+- `src/domain/scoring.js` til scoreintervaller, vægtede gennemsnit, status og matrixgeometri
 - `src/domain/storage.js` til localStorage-load/save/reset og migrering
 - `src/domain/export.js` til JSON- og tekstpayloads
 - `src/components/*` til kort, matrix, scoring, print og eksport
 
 Acceptance criteria:
 
-- ingen funktionel aendring i workshopflowet
-- `npm.cmd run build` er groent
-- `npm.cmd run lint` er groent
-- eksisterende localStorage-data fra `STORAGE_KEY` kan stadig indlaeses
-- aktiv PDF og samlet workshop-PDF viser samme indhold som foer refaktoreringen
+- ingen funktionel ændring i workshopflowet
+- `npm.cmd run build` er grønt
+- `npm.cmd run lint` er grønt
+- eksisterende localStorage-data fra `STORAGE_KEY` kan stadig indlæses
+- aktiv PDF og samlet workshop-PDF viser samme indhold som før refaktoreringen
 
 Relevant kode:
 
@@ -571,19 +571,19 @@ Relevant kode:
 - `src/App.jsx:1183`
 - `src/App.jsx:1336`
 
-### P1 - Goer deployment reproducerbar med `npm ci` og predeploy-checks
+### P1 - Gør deployment reproducerbar med `npm ci` og predeploy-checks
 
-**Status:** aaben  
+**Status:** åben  
 **Type:** CI/CD  
-**Rationale:** GitHub Pages-workflowet bruger `npm install`, selv om projektet har `package-lock.json`. Det kan give smaa forskelle mellem lokale builds og GitHub Pages. Deployment boer bruge lockfile deterministisk og stoppe foer deploy, hvis lint/test/build fejler.
+**Rationale:** GitHub Pages-workflowet bruger `npm install`, selv om projektet har `package-lock.json`. Det kan give små forskelle mellem lokale builds og GitHub Pages. Deployment bør bruge lockfile deterministisk og stoppe før deploy, hvis lint/test/build fejler.
 
 Acceptance criteria:
 
 - `.github/workflows/deploy.yml` bruger `npm ci`
-- workflowet koerer lint
-- workflowet koerer tests, naar testscript findes
-- workflowet koerer build
-- Pages deploy koerer kun efter groenne checks
+- workflowet kører lint
+- workflowet kører tests, når testscript findes
+- workflowet kører build
+- Pages deploy kører kun efter grønne checks
 - Node-version er dokumenteret i backlog eller `.nvmrc`/`.node-version`
 
 Relevant kode:
@@ -594,24 +594,24 @@ Relevant kode:
 
 ### P1 - Lav regressionsscenarier for workshopfunktionalitet
 
-**Status:** aaben  
+**Status:** åben  
 **Type:** test/fastholdelse af funktionalitet  
-**Rationale:** De vigtigste risici handler ikke kun om beregninger, men om at workshoppen ikke mister data eller PDF-output under brug. Der boer vaere faste scenarier, der gentages foer release.
+**Rationale:** De vigtigste risici handler ikke kun om beregninger, men om at workshoppen ikke mister data eller PDF-output under brug. Der bør være faste scenarier, der gentages før release.
 
 Acceptance criteria:
 
 - opret nyt initiativ, score to faktorer og gem lokalt
 - skift mellem to initiativer uden at score eller kommentarer forsvinder
-- dupliker et initiativ og verificer at kopien kan aendres uafhaengigt
-- nulstil aktiv scoring og verificer at kommentarer, noter og metodeadvarsler er vaek
-- slet lokal data og verificer ren starttilstand
+- duplikér et initiativ og verificer at kopien kan ændres uafhængigt
+- nulstil aktiv scoring og verificér at kommentarer, noter og metodeadvarsler er væk
+- slet lokal data og verificér ren starttilstand
 - lav aktiv PDF med kommentarer
 - lav samlet workshop-PDF med matrix og kommentarer pr. initiativ
-- eksporter aktiv JSON og samlet JSON
-- kopier aktiv tekst og samlet tekst
-- genindlaes siden og verificer at localStorage-data bevares
+- eksportér aktiv JSON og samlet JSON
+- kopiér aktiv tekst og samlet tekst
+- genindlæs siden og verificér at localStorage-data bevares
 
-Foreslaaet automatisering:
+Foreslået automatisering:
 
 - Playwright smoke-test for browserflow
 - manuel workshop-checkliste i `BACKLOG.md` eller `docs/release-checklist.md`
@@ -626,11 +626,11 @@ Relevant kode:
 - `src/App.jsx:1252`
 - `src/App.jsx:1572`
 
-### P1 - Versioner localStorage-schema og migrationsregler
+### P1 - Versionér localStorage-schema og migrationsregler
 
-**Status:** aaben  
+**Status:** åben  
 **Type:** datakvalitet/fastholdelse af funktionalitet  
-**Rationale:** Appen understoetter aeldre state-former via fallback, men der er ikke en tydelig schema-version eller migreringsstrategi. Det er vigtigt, fordi workshopdata ligger lokalt i browseren og ikke maa gaa tabt ved fremtidige aendringer.
+**Rationale:** Appen understøtter ældre state-former via fallback, men der er ikke en tydelig schema-version eller migreringsstrategi. Det er vigtigt, fordi workshopdata ligger lokalt i browseren og ikke må gå tabt ved fremtidige ændringer.
 
 Acceptance criteria:
 
@@ -638,7 +638,7 @@ Acceptance criteria:
 - migrering fra tidligere `activeAssessment`-format er eksplicit testet
 - manglende eller defekte felter normaliseres uden at slette brugerdata
 - fejl ved korrupt localStorage giver ren fallback og synlig status
-- release-noter beskriver, hvis en version aendrer lokal datamodel
+- release-noter beskriver, hvis en version ændrer lokal datamodel
 
 Relevant kode:
 
@@ -648,22 +648,22 @@ Relevant kode:
 
 ### P2 - Ryd op i ubrugte template-filer, CSS og assets
 
-**Status:** aaben  
+**Status:** åben  
 **Type:** oprydning  
-**Rationale:** Repoet indeholder Vite/React-template-rester, som ikke ser ud til at vaere del af BUVI-vaerktoejet. Det goer projektet mere stoejende og kan forvirre fremtidig vedligeholdelse.
+**Rationale:** Repoet indeholder Vite/React-template-rester, som ikke ser ud til at være del af BUVI-værktøjet. Det gør projektet mere støjende og kan forvirre fremtidig vedligeholdelse.
 
 Mulige oprydninger:
 
-- fjern eller verificer `src/App.css`, som ikke importeres i `main.jsx`
+- fjern eller verificér `src/App.css`, som ikke importeres i `main.jsx`
 - fjern `src/assets/vite.svg`, hvis den ikke bruges
 - fjern `src/assets/react.svg`, hvis den ikke bruges
-- opdater `README.md` fra Vite-template til faktisk projektbeskrivelse
+- opdatér `README.md` fra Vite-template til faktisk projektbeskrivelse
 
 Acceptance criteria:
 
 - ingen ubrugte template-assets ligger tilbage
 - README forklarer lokal udvikling, build, deploy og workshop-release
-- `npm.cmd run build` er groent efter oprydning
+- `npm.cmd run build` er grønt efter oprydning
 
 Relevant kode:
 
@@ -671,40 +671,40 @@ Relevant kode:
 - `src/App.css:1`
 - `README.md:1`
 
-### P2 - Tilfoej tilgaengeligheds- og responsivitetssmoke-test
+### P2 - Tilføj tilgængeligheds- og responsivitetssmoke-test
 
-**Status:** aaben  
+**Status:** åben  
 **Type:** UX/test  
-**Rationale:** Vaerktoejet bruges live i workshop og til PDF-output. Det boer testes paa de skaermstoerrelser og browsere, der bruges i praksis, saa layout, knapper og matrix ikke bryder.
+**Rationale:** Værktøjet bruges live i workshop og til PDF-output. Det bør testes på de skærmstørrelser og browsere, der bruges i praksis, så layout, knapper og matrix ikke bryder.
 
 Acceptance criteria:
 
-- desktop smoke-test ved typisk facilitator-skaerm
+- desktop smoke-test ved typisk facilitator-skærm
 - laptop smoke-test ved workshop-laptop
-- mobil/tablet sanity check for laesbarhed
-- tastaturfokus kan bruges paa primaere handlinger
+- mobil/tablet sanity check for læsbarhed
+- tastaturfokus kan bruges på primære handlinger
 - tekst i knapper og kort overlapper ikke
 - printvisning skjuler normal app og viser korrekt PDF-rapport
-- matrixlabels og punkter er laesbare i print
+- matrixlabels og punkter er læsbare i print
 
-Foreslaaet automatisering:
+Foreslået automatisering:
 
 - Playwright screenshots for desktop og mobil
 - manuel PDF-sammenligning ved release-freeze
 
 ## 7. Releaseprincip for workshopversion
 
-Foer workshop boer der laves en bevidst release-freeze, hvor der kun rettes P0-fejl.
+Før workshop bør der laves en bevidst release-freeze, hvor der kun rettes P0-fejl.
 
-Minimum foer push til public workshopversion:
+Minimum før push til public workshopversion:
 
-- build er groent
-- lint er enten groent eller kendte lint-fejl er eksplicit accepteret
+- build er grønt
+- lint er enten grønt eller kendte lint-fejl er eksplicit accepteret
 - aktivt workshopflow er manuelt testet
 - PDF-output er visuelt tjekket
 - GitHub Pages viser forventet version
-- facilitator har testet paa den faktiske workshopmaskine/browser
+- facilitator har testet på den faktiske workshopmaskine/browser
 - referencefiler er gemt
 - GitHub tag/release er oprettet
 
-Efter freeze boer nye funktioner parkeres som backlogkort, medmindre de retter en konkret workshopblokering.
+Efter freeze bør nye funktioner parkeres som backlogkort, medmindre de retter en konkret workshopblokering.
